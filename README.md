@@ -27,6 +27,19 @@ When the operator has not published a schedule for a day, that day's sensors are
 
 Then go to Settings → Devices & services → Add integration → **Mykolaivoblenergo Outages**. Add one entry per queue. Use ⋮ → *Reconfigure* to change the queue while keeping the entities.
 
+### Dashboard card
+
+The integration ships its own card. No separate download or dashboard resource is needed. Edit a dashboard → **Add card** → **By card** → **Mykolaivoblenergo Outages** (under *Community cards*), then choose your queue device.
+
+It shows the live power status, a countdown to the next outage or to restoration, and half-hour timelines for today and tomorrow with a "now" marker.
+
+```yaml
+type: custom:mykolaiv-outages-card
+device: <device id>          # chosen in the visual editor
+title: Home                  # optional
+show_tomorrow: true          # optional
+```
+
 ### Automation example
 
 ```yaml
@@ -61,6 +74,8 @@ Entity IDs depend on the entry title; check yours under the device.
 Поки графік на день не опубліковано, сенсори цього дня мають стан `unknown`. **Електропостачання** працює завжди.
 
 Встановлення: через HACS (custom repository, тип *Integration*) або скопіюйте `custom_components/mykolaiv_outages` у `config/custom_components/` і перезапустіть Home Assistant. Далі: Налаштування → Пристрої та служби → Додати інтеграцію → **Mykolaivoblenergo Outages**.
+
+Інтеграція має власну картку: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги.
 
 ## Development
 
