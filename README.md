@@ -53,12 +53,14 @@ One automation for a queue's notifications: a warning N minutes before a schedul
 In **Send notification**, add the actions that deliver them, using `{{ title }}` and `{{ message }}`. For example, to a Telegram channel through your existing Telegram bot (copy the action your other Telegram automations already use):
 
 ```yaml
-- action: telegram_bot.send_message
+- action: notify.send_message
+  target:
+    entity_id: notify.my_telegram_channel   # your Telegram bot's notify entity
   data:
-    target: -1001234567890        # your channel or chat ID
-    title: "{{ title }}"
-    message: "{{ message }}"
+    message: '{{ title }}{{ "\n" }}{{ message }}'
 ```
+
+`telegram_bot.send_message` works too: pick the chat with `entity_id` (a Telegram notify entity) or `config_entry_id` + `chat_id`, see [the action's documentation](https://www.home-assistant.io/actions/telegram_bot.send_message/).
 
 or to the Companion app: `action: notify.mobile_app_<your_phone>` with the same `title` and `message`. Several actions send to several places.
 
