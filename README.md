@@ -4,6 +4,8 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 
 [**English**](#english) | [Українською](#українською)
 
+<img src="https://raw.githubusercontent.com/Fant0m771/ha_mykolaiv_outages/main/docs/images/card.png" alt="Mykolaivoblenergo Outages dashboard card" width="480">
+
 ## English
 
 ### Features
