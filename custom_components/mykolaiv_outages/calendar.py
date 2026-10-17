@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+from homeassistant.components.calendar import (
+    CalendarEntity,
+    CalendarEntityDescription,
+    CalendarEvent,
+)
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
@@ -14,7 +17,7 @@ from . import MykolaivConfigEntry
 from .entity import MykolaivEntity
 from .schedule import SlotKind, day_intervals
 
-DESCRIPTION = EntityDescription(key="outages", translation_key="outages")
+DESCRIPTION = CalendarEntityDescription(key="outages", translation_key="outages")
 
 
 async def async_setup_entry(
