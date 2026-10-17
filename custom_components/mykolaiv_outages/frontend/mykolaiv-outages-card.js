@@ -1,5 +1,8 @@
 /* Mykolaivoblenergo Outages card: live power, countdown and day timelines. */
-const CARD_VERSION = "0.4.1";
+// The legacy frontend build loads this as a classic script: keep names out
+// of the global scope.
+(() => {
+const CARD_VERSION = "0.4.2";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
@@ -509,12 +512,38 @@ const ICON_OFF = `<svg viewBox="0 0 24 24"><path d="M11 15H6l7-14v8h5l-7 14z" op
 const STYLE = `
   :host { --mo-off: var(--error-color, #db4437); --mo-possible: var(--warning-color, #ffa600);
           --mo-on: var(--success-color, #43a047); }
+  /* Tints: plain rgba for WebViews without color-mix (it is invalid at computed
+     time there, which would blank the background), theme-aware where supported. */
+  :host {
+         --mo-off-14: rgba(219, 68, 55, 0.14);
+         --mo-off-16: rgba(219, 68, 55, 0.16);
+         --mo-off-18: rgba(219, 68, 55, 0.18);
+         --mo-off-70: rgba(219, 68, 55, 0.7);
+         --mo-on-16: rgba(76, 175, 80, 0.16);
+         --mo-on-18: rgba(76, 175, 80, 0.18);
+         --mo-on-30: rgba(76, 175, 80, 0.3);
+         --mo-possible-14: rgba(255, 166, 0, 0.14);
+         --mo-possible-75: rgba(255, 166, 0, 0.75);
+  }
+  @supports (color: color-mix(in srgb, red 50%, transparent)) {
+    :host {
+           --mo-off-14: color-mix(in srgb, var(--mo-off) 14%, transparent);
+           --mo-off-16: color-mix(in srgb, var(--mo-off) 16%, transparent);
+           --mo-off-18: color-mix(in srgb, var(--mo-off) 18%, transparent);
+           --mo-off-70: color-mix(in srgb, var(--mo-off) 70%, transparent);
+           --mo-on-16: color-mix(in srgb, var(--mo-on) 16%, transparent);
+           --mo-on-18: color-mix(in srgb, var(--mo-on) 18%, transparent);
+           --mo-on-30: color-mix(in srgb, var(--mo-on) 30%, transparent);
+           --mo-possible-14: color-mix(in srgb, var(--mo-possible) 14%, transparent);
+           --mo-possible-75: color-mix(in srgb, var(--mo-possible) 75%, transparent);
+    }
+  }
   ha-card { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
   .clickable { cursor: pointer; }
   .header { display: flex; align-items: center; gap: 12px; }
   .icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
-          background: color-mix(in srgb, var(--mo-on) 18%, transparent); color: var(--mo-on); }
-  .icon.off { background: color-mix(in srgb, var(--mo-off) 18%, transparent); color: var(--mo-off); }
+          background: var(--mo-on-18); color: var(--mo-on); }
+  .icon.off { background: var(--mo-off-18); color: var(--mo-off); }
   .icon.unknown { background: var(--secondary-background-color); color: var(--secondary-text-color); }
   .icon svg { width: 24px; height: 24px; fill: currentColor; }
   .heading { flex: 1; min-width: 0; }
@@ -523,13 +552,13 @@ const STYLE = `
   .sub { font-size: 12px; color: var(--secondary-text-color); }
   .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
            font-size: 12px; font-weight: 600; white-space: nowrap; flex: none;
-           background: color-mix(in srgb, var(--mo-on) 16%, transparent); color: var(--mo-on); }
+           background: var(--mo-on-16); color: var(--mo-on); }
   .badge i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-  .badge.off { background: color-mix(in srgb, var(--mo-off) 16%, transparent); color: var(--mo-off); }
+  .badge.off { background: var(--mo-off-16); color: var(--mo-off); }
   .badge.unknown, .badge.demo { background: var(--secondary-background-color); color: var(--secondary-text-color); }
   .hero { border-radius: 14px; padding: 12px 14px; background: var(--secondary-background-color); }
-  .hero.alert { background: color-mix(in srgb, var(--mo-off) 14%, transparent); }
-  .hero.next { background: color-mix(in srgb, var(--mo-possible) 14%, transparent); }
+  .hero.alert { background: var(--mo-off-14); }
+  .hero.next { background: var(--mo-possible-14); }
   .hero .label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
                  color: var(--secondary-text-color); }
   .hero .value { font-size: 22px; font-weight: 700; margin-top: 2px; color: var(--primary-text-color);
@@ -541,10 +570,10 @@ const STYLE = `
                    color: var(--primary-text-color); margin-bottom: 6px; }
   .timeline .date { font-weight: 400; color: var(--secondary-text-color); }
   .bar { position: relative; display: grid; grid-template-columns: repeat(48, 1fr); gap: 2px; height: 22px; }
-  .cell { border-radius: 3px; background: color-mix(in srgb, var(--mo-on) 30%, transparent); }
-  .cell.off { background: color-mix(in srgb, var(--mo-off) 70%, transparent); }
+  .cell { border-radius: 3px; background: var(--mo-on-30); }
+  .cell.off { background: var(--mo-off-70); }
   .cell.confirmed { background: var(--mo-off); }
-  .cell.possible { background: color-mix(in srgb, var(--mo-possible) 75%, transparent); }
+  .cell.possible { background: var(--mo-possible-75); }
   .cell.past { opacity: .35; }
   .now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px;
          background: var(--primary-text-color); box-shadow: 0 0 0 2px var(--card-background-color, #fff); }
@@ -560,7 +589,7 @@ const STYLE = `
   .emergency i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--mo-on); }
   .emergency .status { font-weight: 600; color: var(--mo-on); white-space: nowrap; }
   .emergency.off { border-color: transparent;
-                   background: color-mix(in srgb, var(--mo-off) 14%, transparent); }
+                   background: var(--mo-off-14); }
   .emergency.off i { background: var(--mo-off); }
   .emergency.off .status { color: var(--mo-off); }
   .emergency.unknown i { background: var(--secondary-text-color); }
@@ -571,10 +600,10 @@ const STYLE = `
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; }
-  .legend i.off { background: color-mix(in srgb, var(--mo-off) 70%, transparent); }
+  .legend i.off { background: var(--mo-off-70); }
   .legend i.confirmed { background: var(--mo-off); }
-  .legend i.on { background: color-mix(in srgb, var(--mo-on) 30%, transparent); }
-  .legend i.possible { background: color-mix(in srgb, var(--mo-possible) 75%, transparent); }
+  .legend i.on { background: var(--mo-on-30); }
+  .legend i.possible { background: var(--mo-possible-75); }
 `;
 
 if (!customElements.get("mykolaiv-outages-card")) {
@@ -591,3 +620,4 @@ if (!customElements.get("mykolaiv-outages-card")) {
   });
   console.info(`%c MYKOLAIV-OUTAGES-CARD %c ${CARD_VERSION} `, "color:#fff;background:#1e5aa8", "");
 }
+})();

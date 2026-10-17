@@ -52,7 +52,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
     # The version query makes browsers fetch the card again after an update.
     version = (await async_get_integration(hass, DOMAIN)).version
-    add_extra_js_url(hass, f"{CARD_URL}?v={version}")
+    url = f"{CARD_URL}?v={version}"
+    add_extra_js_url(hass, url)
+    # Browsers older than the frontend's "modern" cut-off (e.g. an Android
+    # WebView below Chrome 131) get the legacy build, which loads only these.
+    add_extra_js_url(hass, url, es5=True)
     return True
 
 

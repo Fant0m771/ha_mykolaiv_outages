@@ -1,7 +1,7 @@
 """Dashboard card registration."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from homeassistant.setup import async_setup_component
 
@@ -21,7 +21,8 @@ async def test_card_is_registered_with_frontend(hass):
     version = json.loads((CARD_FILE.parents[1] / "manifest.json").read_text())[
         "version"
     ]
-    add_js.assert_called_once_with(hass, f"{CARD_URL}?v={version}")
+    url = f"{CARD_URL}?v={version}"
+    assert add_js.call_args_list == [call(hass, url), call(hass, url, es5=True)]
 
 
 async def test_card_skipped_without_frontend(hass):
