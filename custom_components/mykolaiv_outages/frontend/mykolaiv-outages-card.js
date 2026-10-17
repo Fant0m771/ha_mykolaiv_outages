@@ -1,5 +1,5 @@
 /* Mykolaivoblenergo Outages card: live power, countdown and day timelines. */
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.0";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 

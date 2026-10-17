@@ -48,6 +48,8 @@ async def test_entities(hass, source):
         "next_outage",
         "restoration",
         "last_update",
+        "outages",
+        "schedule",
     }
     assert result["power"].state == "off"
     assert result["scheduled_power"].state == "off"

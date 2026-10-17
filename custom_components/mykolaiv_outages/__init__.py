@@ -16,7 +16,12 @@ from homeassistant.loader import async_get_integration
 from .const import DOMAIN
 from .coordinator import MykolaivCoordinator, async_acquire, async_release
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.CALENDAR,
+    Platform.EVENT,
+    Platform.SENSOR,
+]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 CARD_FILE = Path(__file__).parent / "frontend" / "mykolaiv-outages-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILE.name}"

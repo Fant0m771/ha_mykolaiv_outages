@@ -81,6 +81,37 @@
         "name": "Електропостачання за графіком"
       }
     },
+    "calendar": {
+      "outages": {
+        "name": "Відключення"
+      }
+    },
+    "event": {
+      "schedule": {
+        "name": "Графік",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "schedule_published": "Графік опубліковано",
+              "schedule_changed": "Графік змінено"
+            }
+          },
+          "day": {
+            "name": "День",
+            "state": {
+              "today": "Сьогодні",
+              "tomorrow": "Завтра"
+            }
+          },
+          "date": {
+            "name": "Дата"
+          },
+          "schedule": {
+            "name": "Графік"
+          }
+        }
+      }
+    },
     "sensor": {
       "today": {
         "name": "Графік на сьогодні"

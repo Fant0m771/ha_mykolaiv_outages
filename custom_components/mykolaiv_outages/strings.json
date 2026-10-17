@@ -81,6 +81,37 @@
         "name": "Power by schedule"
       }
     },
+    "calendar": {
+      "outages": {
+        "name": "Outages"
+      }
+    },
+    "event": {
+      "schedule": {
+        "name": "Schedule",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "schedule_published": "Schedule published",
+              "schedule_changed": "Schedule changed"
+            }
+          },
+          "day": {
+            "name": "Day",
+            "state": {
+              "today": "Today",
+              "tomorrow": "Tomorrow"
+            }
+          },
+          "date": {
+            "name": "Date"
+          },
+          "schedule": {
+            "name": "Schedule"
+          }
+        }
+      }
+    },
     "sensor": {
       "today": {
         "name": "Today's schedule"

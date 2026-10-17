@@ -16,6 +16,8 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 - **Today's / Tomorrow's schedule**: all outage periods, e.g. `10:30–12:00; 16:30–19:00`. The attributes list every period with its kind: `off` (planned), `confirmed` (actual), `possible` (power possible).
 - **Next outage** and **Power restoration**: timestamps for automations. They are unknown rather than guessed when the end lies beyond the published schedule.
 - **Schedule updated**: when the operator last changed the schedule.
+- **Outages** calendar: every outage as a calendar event, for calendar triggers with an offset.
+- **Schedule** events: `schedule_published` and `schedule_changed`, with `day` (`today`/`tomorrow`), `date` and `schedule` attributes.
 - One shared request every 5 minutes for all configured queues. States also update on every half-hour boundary.
 - English and Ukrainian.
 
@@ -42,24 +44,44 @@ title: Home                  # optional
 show_tomorrow: true          # optional
 ```
 
-### Automation example
+### Notifications blueprint
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
+
+One automation for a queue's phone notifications: a warning N minutes before a scheduled outage, power lost and restored, tomorrow's schedule published and schedule changes. Each one can be switched off.
+
+### Automation examples
+
+Warn 15 minutes before every outage, using the calendar:
 
 ```yaml
-automation:
-  - alias: Power outage started
-    triggers:
-      - trigger: state
-        entity_id: binary_sensor.cherga_4_2_power
-        to: "off"
-    actions:
-      - action: notify.notify
-        data:
-          message: >
-            Power is off. Expected back:
-            {{ states('sensor.cherga_4_2_power_restoration') | as_datetime | as_local }}
+triggers:
+  - trigger: calendar
+    event: start
+    entity_id: calendar.cherga_4_2_outages
+    offset: "-0:15:0"
+actions:
+  - action: notify.notify
+    data:
+      message: "Power outage at {{ trigger.calendar_event.start[11:16] }}"
 ```
 
-Entity IDs depend on the entry title; check yours under the device.
+Tomorrow's schedule is published:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.cherga_4_2_schedule
+conditions:
+  - "{{ trigger.to_state.attributes.event_type == 'schedule_published' }}"
+  - "{{ trigger.to_state.attributes.day == 'tomorrow' }}"
+actions:
+  - action: notify.notify
+    data:
+      message: "Tomorrow: {{ trigger.to_state.attributes.schedule }}"
+```
+
+Entity IDs depend on the entry title and language; check yours under the device. Schedule events compare each refresh with the previous one, so changes made while Home Assistant was off are not reported.
 
 ## Українською
 
@@ -71,11 +93,17 @@ Entity IDs depend on the entry title; check yours under the device.
 - **Графік на сьогодні / завтра**: усі періоди відключень. В атрибутах є кожен період із типом: `off` (заплановане), `confirmed` (актуальне), `possible` (електропостачання можливе).
 - **Наступне відключення** та **Відновлення живлення**: мітки часу для автоматизацій. Якщо кінець виходить за межі опублікованого графіка, значення невідоме, а не вгадане.
 - **Оновлення графіка**: коли обленерго востаннє змінило графік.
+- Календар **Відключення**: кожне відключення як подія календаря; тригер календаря дозволяє попередження із зсувом, наприклад за 15 хв.
+- Події **Графік**: `schedule_published` (графік опубліковано) і `schedule_changed` (графік змінено) з атрибутами `day` (`today`/`tomorrow`), `date` і `schedule`.
 - Один спільний запит кожні 5 хвилин для всіх черг; стани оновлюються кожні пів години.
 
 Поки графік на день не опубліковано, сенсори цього дня мають стан `unknown`. **Електропостачання** працює завжди.
 
 Встановлення: через HACS (custom repository, тип *Integration*) або скопіюйте `custom_components/mykolaiv_outages` у `config/custom_components/` і перезапустіть Home Assistant. Далі: Налаштування → Пристрої та служби → Додати інтеграцію → **Mykolaivoblenergo Outages**.
+
+**Шаблон сповіщень** (кнопка нижче): попередження за N хвилин до відключення, зникнення та відновлення світла, графік на завтра та зміни графіка. Кожне сповіщення можна вимкнути.
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
 Інтеграція має власну картку: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги.
 
