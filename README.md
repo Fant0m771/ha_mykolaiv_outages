@@ -2,6 +2,8 @@
 
 Home Assistant integration for АТ «Миколаївобленерго» hourly outage schedules (ГПВ), read directly from the operator's public site [off.energy.mk.ua](https://off.energy.mk.ua).
 
+[![Open your Home Assistant instance and open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Fant0m771&repository=ha_mykolaiv_outages&category=integration)
+
 [**English**](#english) | [Українською](#українською)
 
 <img src="https://raw.githubusercontent.com/Fant0m771/ha_mykolaiv_outages/main/docs/images/card.png" alt="Mykolaivoblenergo Outages dashboard card" width="480">
