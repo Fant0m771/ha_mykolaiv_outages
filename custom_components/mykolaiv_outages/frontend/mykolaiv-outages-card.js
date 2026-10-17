@@ -1,5 +1,5 @@
 /* Mykolaivoblenergo Outages card: live power, countdown and day timelines. */
-const CARD_VERSION = "0.4.0";
+const CARD_VERSION = "0.4.1";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
@@ -31,6 +31,8 @@ const TEXT = {
     updated: "Updated",
     emergency_outage: "Emergency outage",
     emergency_detail: "Emergency outages have no published end time",
+    emergency_queues: "Emergency queues",
+    emergency_off: "switched off",
     stale: "No connection to the operator since",
     example: "Example",
     h: "h",
@@ -67,6 +69,8 @@ const TEXT = {
     updated: "Оновлено",
     emergency_outage: "Аварійне відключення",
     emergency_detail: "Для аварійних відключень час відновлення не публікується",
+    emergency_queues: "Аварійні черги",
+    emergency_off: "відключено",
     stale: "Немає зв'язку з обленерго з",
     example: "Приклад",
     h: "год",
@@ -181,6 +185,9 @@ function demoData(t) {
     nextOutage: upcoming ? at(start * 30) : null,
     restoration: upcoming ? at(end * 30) : null,
     outageContext: upcoming ? "next" : "none",
+    emergency: true,
+    emergencyAll: ["ГАВ 9"],
+    emergencyQueues: [],
     updated: at(nowMinutes - 25),
   };
 }
@@ -284,6 +291,7 @@ class MykolaivOutagesCard extends HTMLElement {
       updated: time("last_update"),
       emergency: bool(emergency),
       emergencyQueues: emergency?.attributes.switched_off || [],
+      emergencyAll: emergency?.attributes.queues || [],
       siteOk: bool(site),
       siteSince: site?.attributes.last_success ? new Date(site.attributes.last_success) : null,
       missing: !today && !power,
@@ -319,6 +327,7 @@ class MykolaivOutagesCard extends HTMLElement {
           <span class="badge ${powerClass}"><i></i>${powerText}</span>
         </div>
         ${data.missing ? `<div class="hint">${t.pick_device}</div>` : this._hero(data, t, now)}
+        ${this._emergencyRow(data, t)}
         ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now)}
         ${
           this._config.show_tomorrow === false
@@ -363,6 +372,19 @@ class MykolaivOutagesCard extends HTMLElement {
         );
       });
     });
+  }
+
+  _emergencyRow(data, t) {
+    // Shown whenever the house has emergency queues, not only during an outage.
+    if (!data.emergencyAll?.length) return "";
+    const tone = data.emergency === null ? "unknown" : data.emergency ? "on" : "off";
+    const status =
+      data.emergency === null ? t.unknown : data.emergency ? t.power_on : t.emergency_off;
+    return `
+      <div class="emergency ${tone}" data-more="emergency_power">
+        <span class="queues"><i></i>${t.emergency_queues}: ${escape(data.emergencyAll.join(", "))}</span>
+        <span class="status">${status}</span>
+      </div>`;
   }
 
   _hero(data, t, now) {
@@ -531,6 +553,18 @@ const STYLE = `
   .pending { font-size: 13px; color: var(--secondary-text-color); padding: 10px 12px; border-radius: 10px;
              border: 1px dashed var(--divider-color); }
   .stale { color: var(--mo-possible); font-weight: 600; }
+  .emergency { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+               padding: 8px 12px; border-radius: 10px; font-size: 13px;
+               border: 1px solid var(--divider-color); color: var(--primary-text-color); }
+  .emergency .queues { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .emergency i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--mo-on); }
+  .emergency .status { font-weight: 600; color: var(--mo-on); white-space: nowrap; }
+  .emergency.off { border-color: transparent;
+                   background: color-mix(in srgb, var(--mo-off) 14%, transparent); }
+  .emergency.off i { background: var(--mo-off); }
+  .emergency.off .status { color: var(--mo-off); }
+  .emergency.unknown i { background: var(--secondary-text-color); }
+  .emergency.unknown .status { color: var(--secondary-text-color); }
   .hint { font-size: 13px; color: var(--secondary-text-color); }
   .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px;
             font-size: 11px; color: var(--secondary-text-color); }
