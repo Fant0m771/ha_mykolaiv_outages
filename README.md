@@ -41,7 +41,7 @@ Then go to Settings → Devices & services → Add integration → **Mykolaivobl
 
 ### Dashboard card
 
-The integration ships its own card. No separate download or dashboard resource is needed. Edit a dashboard → **Add card** → **By card** → **Mykolaivoblenergo Outages** (under *Community cards*), then choose your queue device.
+The integration ships its own card and adds it to the dashboard resources itself (Settings → Dashboards → ⋮ → Resources), so there is nothing to download. With dashboards in YAML mode it is loaded on every page instead. Edit a dashboard → **Add card** → **By card** → **Mykolaivoblenergo Outages** (under *Community cards*), then choose your queue device.
 
 It shows the live power status, a countdown to the next outage or to restoration, and half-hour timelines for today and tomorrow with a "now" marker.
 
@@ -131,7 +131,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
-Інтеграція має власну картку: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги.
+Інтеграція має власну картку і сама додає її до ресурсів дашбордів, завантажувати нічого не треба: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги.
 
 ## Development
 

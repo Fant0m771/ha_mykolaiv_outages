@@ -33,8 +33,12 @@ one bug (calendar description class) and one outdated README example (Telegram
   redacted.
 - `config_flow.py`: address lookup (branch → settlement → street → house) or
   manual queue; reconfigure; one entry per queue (unique ID = queue name).
-- `frontend/mykolaiv-outages-card.js`: bundled Lovelace card, served and
-  registered in `async_setup` (`add_extra_js_url`), no build step.
+- `frontend/mykolaiv-outages-card.js`: bundled Lovelace card, no build step.
+  `card.py` serves it and adds it as a dashboard resource (storage mode; kept
+  up to date with the version, removed with the last entry). Only in YAML mode
+  does it fall back to `add_extra_js_url` (both builds): page scripts load
+  independently of the dashboard, and the Android app then showed
+  "Configuration error" intermittently.
 - `blueprints/automation/mykolaiv_outages/notifications.yaml`: notifications
   blueprint; users import it from GitHub `main`, so changes reach them without a
   release (they must "Re-import blueprint").

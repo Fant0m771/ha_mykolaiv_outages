@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
-from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
@@ -14,8 +11,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
 
+from .card import async_ensure_resource, async_register_card, async_remove_resource
 from .const import CONF_HOUSE, DOMAIN, HOUSE_CHECK_INTERVAL
 from .coordinator import (
     MykolaivCoordinator,
@@ -37,8 +34,6 @@ PLATFORMS = [
     Platform.SENSOR,
 ]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-CARD_FILE = Path(__file__).parent / "frontend" / "mykolaiv-outages-card.js"
-CARD_URL = f"/{DOMAIN}/{CARD_FILE.name}"
 
 type MykolaivConfigEntry = ConfigEntry[MykolaivCoordinator]
 
@@ -47,21 +42,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Serve the dashboard card so it appears in the card picker."""
     if getattr(hass, "http", None) is None or "frontend" not in hass.config.components:
         return True
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(CARD_FILE), True)]
-    )
-    # The version query makes browsers fetch the card again after an update.
-    version = (await async_get_integration(hass, DOMAIN)).version
-    url = f"{CARD_URL}?v={version}"
-    add_extra_js_url(hass, url)
-    # Browsers older than the frontend's "modern" cut-off (e.g. an Android
-    # WebView below Chrome 131) get the legacy build, which loads only these.
-    add_extra_js_url(hass, url, es5=True)
+    await async_register_card(hass)
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) -> bool:
     """Set up one queue on the shared coordinator."""
+    # Again after the integration was removed and added back without a restart.
+    await async_ensure_resource(hass)
     coordinator = await async_acquire(hass)
     entry.runtime_data = coordinator
     try:
@@ -96,7 +84,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) ->
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) -> None:
-    """Forget the stored schedule and any open repair issues."""
+    """Forget the stored schedule, repair issues and, last, the card resource."""
     await schedule_store(hass, entry.entry_id).async_remove()
     for issue in (missing_issue(entry.entry_id), changed_issue(entry.entry_id)):
         ir.async_delete_issue(hass, DOMAIN, issue)
+    others = hass.config_entries.async_entries(DOMAIN)
+    if not any(other.entry_id != entry.entry_id for other in others):
+        await async_remove_resource(hass)

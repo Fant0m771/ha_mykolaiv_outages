@@ -3,7 +3,8 @@
   "name": "Mykolaivoblenergo Outages",
   "after_dependencies": [
     "frontend",
-    "http"
+    "http",
+    "lovelace"
   ],
   "codeowners": [
     "@Fant0m771"
@@ -14,5 +15,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Fant0m771/ha_mykolaiv_outages/issues",
   "requirements": [],
-  "version": "0.4.3"
+  "version": "0.4.4"
 }
