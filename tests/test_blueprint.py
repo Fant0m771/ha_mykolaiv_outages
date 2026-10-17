@@ -162,3 +162,15 @@ async def test_blueprint_options_off(hass):
     set_event(hass, "2026-10-17T08:01:00+00:00", "schedule_changed", "today", "y")
     await hass.async_block_till_done()
     assert sent == []
+
+
+async def test_manual_run_sends_test_message(hass):
+    sent = await start(hass)
+    await hass.services.async_call(
+        "automation", "trigger", {"entity_id": "all"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert sent[-1].data == {
+        "title": "🧪 Перевірка сповіщень",
+        "message": "Сповіщення про відключення світла працюють.",
+    }

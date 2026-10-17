@@ -114,8 +114,10 @@ variables:
   event_type: "{{ trigger.to_state.attributes.event_type if is_event else '' }}"
   event_day: "{{ trigger.to_state.attributes.day if is_event else '' }}"
   event_schedule: "{{ trigger.to_state.attributes.schedule if is_event else '' }}"
+  # A manual "Run actions" has no trigger id: send a test message.
   title: >-
-    {%- if trigger.id == 'soon' -%} ⚡ Скоро відключення
+    {%- if trigger.id is not defined -%} 🧪 Перевірка сповіщень
+    {%- elif trigger.id == 'soon' -%} ⚡ Скоро відключення
     {%- elif trigger.id == 'power_off' and notify_power -%} 🔌 Світло зникло
     {%- elif trigger.id == 'power_on' and notify_power -%} 💡 Світло є
     {%- elif notify_tomorrow and event_type == 'schedule_published' and event_day == 'tomorrow' -%} 📅 Графік на завтра
@@ -124,7 +126,8 @@ variables:
     {%- endif -%}
   message: >-
     {%- set start = states(next_outage_entity) | as_datetime(none) -%}
-    {%- if trigger.id == 'soon' and start is not none -%} Відключення о {{ as_local(start).strftime('%H:%M') }} (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
+    {%- if trigger.id is not defined -%} Сповіщення про відключення світла працюють.
+    {%- elif trigger.id == 'soon' and start is not none -%} Відключення о {{ as_local(start).strftime('%H:%M') }} (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
     {%- elif trigger.id == 'power_off' -%} Обленерго повідомляє про відключення вашої черги.
     {%- elif trigger.id == 'power_on' -%} Електропостачання відновлено.
     {%- else -%} {{ event_schedule }}
