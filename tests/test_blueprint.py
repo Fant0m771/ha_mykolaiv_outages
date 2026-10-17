@@ -1,4 +1,4 @@
-"""The notification blueprint is a valid automation once filled in."""
+"""The notification blueprint is a valid automation and sends what it should."""
 
 from datetime import timedelta
 from pathlib import Path
@@ -19,71 +19,27 @@ BLUEPRINT = (
     / "mykolaiv_outages"
     / "notifications.yaml"
 )
+# What a user would pick, e.g. telegram_bot.send_message; notify.notify is mocked.
+SEND = [
+    {
+        "action": "notify.notify",
+        "data": {"title": "{{ title }}", "message": "{{ message }}"},
+    }
+]
+RESTORED = {
+    "event_type": "schedule_published",
+    "day": "tomorrow",
+    "schedule": "01:00–02:00",
+}
 
 
-def without_device_actions(steps):
-    """mobile_app cannot load in the minimum HA fixture (no hassil); validate the
-    same title/message templates through notify.notify instead."""
-    result = []
-    for step in steps:
-        if step.get("domain") == "mobile_app":
-            step = {
-                "action": "notify.notify",
-                "data": {"title": step["title"], "message": step["message"]},
-            }
-        elif "choose" in step:
-            step = {
-                "choose": [
-                    {**option, "sequence": without_device_actions(option["sequence"])}
-                    for option in step["choose"]
-                ]
-            }
-        result.append(step)
-    return result
-
-
-async def test_blueprint_is_valid(hass):
-    blueprint = Blueprint(
-        load_yaml_dict(BLUEPRINT), expected_domain="automation", schema=BLUEPRINT_SCHEMA
-    )
-    inputs = BlueprintInputs(
-        blueprint,
-        {
-            "use_blueprint": {
-                "path": "mykolaiv_outages/notifications.yaml",
-                "input": {
-                    "power_entity": "binary_sensor.cherga_1_1_power",
-                    "next_outage_entity": "sensor.cherga_1_1_next_outage",
-                    "schedule_entity": "event.cherga_1_1_schedule",
-                    "notify_device": "abc123",
-                },
-            }
-        },
-    )
-    inputs.validate()
-    config = inputs.async_substitute()
-    assert config["triggers"][0]["id"] == "soon"
-    assert config["variables"]["notify_tomorrow"] is True
-    assert (
-        sum(
-            option["sequence"][0]["domain"] == "mobile_app"
-            for option in config["actions"][0]["choose"]
-        )
-        == 5
-    )
-    config["actions"] = without_device_actions(config["actions"])
-    result = await async_validate_config_item(hass, "test", config)
-    assert result is not None
-    assert result.validation_error is None, result.validation_error
-
-
-def automation_config(lead=15):
+def automation_config(**extra):
     blueprint = Blueprint(
         load_yaml_dict(BLUEPRINT),
         expected_domain="automation",
         schema=BLUEPRINT_SCHEMA,
     )
-    config = BlueprintInputs(
+    inputs = BlueprintInputs(
         blueprint,
         {
             "use_blueprint": {
@@ -92,29 +48,52 @@ def automation_config(lead=15):
                     "power_entity": "binary_sensor.power",
                     "next_outage_entity": "sensor.next_outage",
                     "schedule_entity": "event.schedule",
-                    "notify_device": "abc123",
-                    "lead_minutes": lead,
+                    "notify_actions": SEND,
+                    **extra,
                 },
             }
         },
-    ).async_substitute()
+    )
+    inputs.validate()
+    config = inputs.async_substitute()
     config["id"] = "notifications"
-    config["actions"] = without_device_actions(config["actions"])
     return config
+
+
+async def start(hass, **extra):
+    sent = async_mock_service(hass, "notify", "notify")
+    assert await async_setup_component(
+        hass, "automation", {"automation": automation_config(**extra)}
+    )
+    await hass.async_block_till_done()
+    return sent
+
+
+def set_event(hass, stamp, event_type, day, schedule):
+    hass.states.async_set(
+        "event.schedule",
+        stamp,
+        {"event_type": event_type, "day": day, "schedule": schedule},
+    )
+
+
+async def test_blueprint_is_valid(hass):
+    config = automation_config()
+    assert config["actions"] == SEND
+    assert config["variables"]["notify_tomorrow"] is True
+    result = await async_validate_config_item(hass, "test", config)
+    assert result is not None
+    assert result.validation_error is None, result.validation_error
 
 
 # The template trigger re-checks now() every minute; that timer outlives the test.
 @pytest.mark.parametrize("expected_lingering_timers", [True])
-async def test_blueprint_notifications(hass, freezer):
-    sent = async_mock_service(hass, "notify", "notify")
+async def test_blueprint_notifications(hass):
     now = dt_util.utcnow()
     hass.states.async_set("binary_sensor.power", "on")
     hass.states.async_set("sensor.next_outage", (now + timedelta(hours=1)).isoformat())
     hass.states.async_set("event.schedule", "unavailable")
-    assert await async_setup_component(
-        hass, "automation", {"automation": automation_config()}
-    )
-    await hass.async_block_till_done()
+    sent = await start(hass)
 
     # Restored after a restart: not a new schedule.
     hass.states.async_set("event.schedule", "2026-10-17T07:00:00+00:00", RESTORED)
@@ -123,16 +102,33 @@ async def test_blueprint_notifications(hass, freezer):
 
     hass.states.async_set("binary_sensor.power", "off")
     await hass.async_block_till_done()
-    assert sent[-1].data["title"] == "🔌 Світло зникло"
+    assert sent[-1].data == {
+        "title": "🔌 Світло зникло",
+        "message": "Обленерго повідомляє про відключення вашої черги.",
+    }
 
     hass.states.async_set("binary_sensor.power", "on")
     await hass.async_block_till_done()
     assert sent[-1].data["title"] == "💡 Світло є"
 
-    hass.states.async_set("event.schedule", "2026-10-17T08:00:00+00:00", PUBLISHED)
+    set_event(
+        hass,
+        "2026-10-17T08:00:00+00:00",
+        "schedule_published",
+        "tomorrow",
+        "06:00–07:00",
+    )
     await hass.async_block_till_done()
-    assert sent[-1].data["title"] == "📅 Графік на завтра"
-    assert sent[-1].data["message"] == "06:00–07:00"
+    assert sent[-1].data == {"title": "📅 Графік на завтра", "message": "06:00–07:00"}
+
+    set_event(
+        hass, "2026-10-17T08:05:00+00:00", "schedule_changed", "today", "10:30–12:00"
+    )
+    await hass.async_block_till_done()
+    assert sent[-1].data == {
+        "title": "📅 Графік на сьогодні змінено",
+        "message": "10:30–12:00",
+    }
 
     count = len(sent)
     hass.states.async_set(
@@ -141,32 +137,28 @@ async def test_blueprint_notifications(hass, freezer):
     await hass.async_block_till_done()
     assert len(sent) == count + 1
     assert sent[-1].data["title"] == "⚡ Скоро відключення"
-    assert "(через 10 хв)" in sent[-1].data["message"]
+    assert sent[-1].data["message"].endswith("(через 10 хв).")
+    assert "\n" not in sent[-1].data["message"]
 
 
-# The template trigger re-checks now() every minute; that timer outlives the test.
 @pytest.mark.parametrize("expected_lingering_timers", [True])
-async def test_blueprint_warning_off(hass):
-    sent = async_mock_service(hass, "notify", "notify")
+async def test_blueprint_options_off(hass):
     now = dt_util.utcnow()
+    hass.states.async_set("binary_sensor.power", "on")
     hass.states.async_set("sensor.next_outage", (now + timedelta(hours=1)).isoformat())
-    assert await async_setup_component(
-        hass, "automation", {"automation": automation_config(lead=0)}
+    hass.states.async_set("event.schedule", "2026-10-17T07:00:00+00:00", RESTORED)
+    sent = await start(
+        hass,
+        lead_minutes=0,
+        notify_power=False,
+        notify_tomorrow=False,
+        notify_changes=False,
     )
     hass.states.async_set(
         "sensor.next_outage", (now + timedelta(minutes=5)).isoformat()
     )
+    hass.states.async_set("binary_sensor.power", "off")
+    set_event(hass, "2026-10-17T08:00:00+00:00", "schedule_published", "tomorrow", "x")
+    set_event(hass, "2026-10-17T08:01:00+00:00", "schedule_changed", "today", "y")
     await hass.async_block_till_done()
     assert sent == []
-
-
-RESTORED = {
-    "event_type": "schedule_published",
-    "day": "tomorrow",
-    "schedule": "01:00–02:00",
-}
-PUBLISHED = {
-    "event_type": "schedule_published",
-    "day": "tomorrow",
-    "schedule": "06:00–07:00",
-}

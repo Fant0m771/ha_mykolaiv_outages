@@ -1,13 +1,15 @@
 blueprint:
   name: Mykolaivoblenergo outage notifications
   description: >-
-    Phone notifications for one queue of the Mykolaivoblenergo Outages
-    integration: a warning before a scheduled outage, power lost and restored,
-    tomorrow's schedule published and schedule changes. Set the minutes to 0
-    or switch an option off to skip that notification.
+    Notifications for one queue of the Mykolaivoblenergo Outages integration:
+    a warning before a scheduled outage, power lost and restored, tomorrow's
+    schedule published and schedule changes. Send them anywhere (Telegram,
+    phone, several channels) with the actions you choose, using
+    {{ title }} and {{ message }}.
 
     Сповіщення для однієї черги: попередження перед відключенням, зникнення та
-    відновлення світла, опублікування графіка на завтра та зміни графіка.
+    відновлення світла, графік на завтра та зміни графіка. Надсилайте куди
+    завгодно (Telegram, телефон) діями з {{ title }} і {{ message }}.
   domain: automation
   source_url: https://github.com/Fant0m771/ha_mykolaiv_outages/blob/main/blueprints/automation/mykolaiv_outages/notifications.yaml
   input:
@@ -36,13 +38,15 @@ blueprint:
           filter:
             - integration: mykolaiv_outages
               domain: event
-    notify_device:
-      name: Phone
-      description: Device with the Home Assistant Companion app.
+    notify_actions:
+      name: Send notification
+      description: >-
+        Actions that deliver each notification. Use {{ title }} and
+        {{ message }} in them, e.g. telegram_bot.send_message to a chat or
+        channel, or notify.mobile_app_<your phone>.
+        Дії для надсилання; використовуйте {{ title }} і {{ message }}.
       selector:
-        device:
-          filter:
-            - integration: mobile_app
+        action: {}
     lead_minutes:
       name: Warn before an outage (minutes)
       description: 0 turns the warning off.
@@ -110,64 +114,24 @@ variables:
   event_type: "{{ trigger.to_state.attributes.event_type if is_event else '' }}"
   event_day: "{{ trigger.to_state.attributes.day if is_event else '' }}"
   event_schedule: "{{ trigger.to_state.attributes.schedule if is_event else '' }}"
+  title: >-
+    {%- if trigger.id == 'soon' -%} ⚡ Скоро відключення
+    {%- elif trigger.id == 'power_off' and notify_power -%} 🔌 Світло зникло
+    {%- elif trigger.id == 'power_on' and notify_power -%} 💡 Світло є
+    {%- elif notify_tomorrow and event_type == 'schedule_published' and event_day == 'tomorrow' -%} 📅 Графік на завтра
+    {%- elif notify_changes and event_type == 'schedule_changed' -%} 📅 Графік на {{ 'сьогодні' if event_day == 'today' else 'завтра' }} змінено
+    {%- elif notify_changes and event_type == 'schedule_published' and event_day == 'today' -%} 📅 Графік на сьогодні опубліковано
+    {%- endif -%}
+  message: >-
+    {%- set start = states(next_outage_entity) | as_datetime(none) -%}
+    {%- if trigger.id == 'soon' and start is not none -%} Відключення о {{ as_local(start).strftime('%H:%M') }} (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
+    {%- elif trigger.id == 'power_off' -%} Обленерго повідомляє про відключення вашої черги.
+    {%- elif trigger.id == 'power_on' -%} Електропостачання відновлено.
+    {%- else -%} {{ event_schedule }}
+    {%- endif -%}
 
-actions:
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: soon
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "⚡ Скоро відключення"
-            message: >-
-              {% set start = states(next_outage_entity) | as_datetime %}
-              Відключення о {{ as_local(start).strftime('%H:%M') }}
-              (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
-      - conditions:
-          - condition: trigger
-            id: power_off
-          - condition: template
-            value_template: "{{ notify_power }}"
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "🔌 Світло зникло"
-            message: Обленерго повідомляє про відключення вашої черги.
-      - conditions:
-          - condition: trigger
-            id: power_on
-          - condition: template
-            value_template: "{{ notify_power }}"
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "💡 Світло є"
-            message: Електропостачання відновлено.
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ notify_tomorrow and event_type == 'schedule_published'
-                 and event_day == 'tomorrow' }}
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "📅 Графік на завтра"
-            message: "{{ event_schedule }}"
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ notify_changes and (event_type == 'schedule_changed'
-                 or (event_type == 'schedule_published' and event_day == 'today')) }}
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: >-
-              📅 Графік на {{ 'сьогодні' if event_day == 'today' else 'завтра' }}
-              {{ 'змінено' if event_type == 'schedule_changed' else 'опубліковано' }}
-            message: "{{ event_schedule }}"
+conditions:
+  - condition: template
+    value_template: "{{ title | trim != '' }}"
+
+actions: !input notify_actions

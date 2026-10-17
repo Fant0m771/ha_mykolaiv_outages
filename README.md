@@ -48,7 +48,19 @@ show_tomorrow: true          # optional
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
-One automation for a queue's phone notifications: a warning N minutes before a scheduled outage, power lost and restored, tomorrow's schedule published and schedule changes. Each one can be switched off.
+One automation for a queue's notifications: a warning N minutes before a scheduled outage, power lost and restored, tomorrow's schedule published and schedule changes. Each one can be switched off.
+
+In **Send notification**, add the actions that deliver them, using `{{ title }}` and `{{ message }}`. For example, to a Telegram channel through your existing Telegram bot (copy the action your other Telegram automations already use):
+
+```yaml
+- action: telegram_bot.send_message
+  data:
+    target: -1001234567890        # your channel or chat ID
+    title: "{{ title }}"
+    message: "{{ message }}"
+```
+
+or to the Companion app: `action: notify.mobile_app_<your_phone>` with the same `title` and `message`. Several actions send to several places.
 
 ### Automation examples
 
@@ -101,7 +113,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 
 Встановлення: через HACS (custom repository, тип *Integration*) або скопіюйте `custom_components/mykolaiv_outages` у `config/custom_components/` і перезапустіть Home Assistant. Далі: Налаштування → Пристрої та служби → Додати інтеграцію → **Mykolaivoblenergo Outages**.
 
-**Шаблон сповіщень** (кнопка нижче): попередження за N хвилин до відключення, зникнення та відновлення світла, графік на завтра та зміни графіка. Кожне сповіщення можна вимкнути.
+**Шаблон сповіщень** (кнопка нижче): попередження за N хвилин до відключення, зникнення та відновлення світла, графік на завтра та зміни графіка. Кожне сповіщення можна вимкнути. У полі **Send notification** додайте дію надсилання з `{{ title }}` і `{{ message }}`, наприклад `telegram_bot.send_message` у ваш Telegram-канал або `notify.mobile_app_<телефон>`.
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
