@@ -1,12 +1,14 @@
 {
   "domain": "mykolaiv_outages",
   "name": "Mykolaivoblenergo Outages",
-  "codeowners": [],
+  "codeowners": [
+    "@Fant0m771"
+  ],
   "config_flow": true,
-  "documentation": "https://github.com/buybarovdenis/ha_mykolaiv_outages",
+  "documentation": "https://github.com/Fant0m771/ha_mykolaiv_outages",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/buybarovdenis/ha_mykolaiv_outages/issues",
+  "issue_tracker": "https://github.com/Fant0m771/ha_mykolaiv_outages/issues",
   "requirements": [],
   "version": "0.1.0"
 }
