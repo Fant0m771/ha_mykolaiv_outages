@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 from typing import Any
 
-from .const import GPV_QUEUE_TYPE, TIME_ZONE
+from .const import EMERGENCY_QUEUE_TYPES, GPV_QUEUE_TYPE, TIME_ZONE
 
 
 class SlotKind(StrEnum):
@@ -35,11 +35,18 @@ PRIORITY = list(SlotKind)
 
 @dataclass(frozen=True, kw_only=True)
 class Queue:
-    """A schedule queue and the operator's live switch-off flag."""
+    """A queue and the operator's live switch-off flag."""
 
     id: int
     name: str
     live_off: bool
+    type_id: int = GPV_QUEUE_TYPE
+
+    @property
+    def label(self) -> str:
+        """How the operator names the queue, e.g. "ГАВ 9"."""
+        prefix = EMERGENCY_QUEUE_TYPES.get(self.type_id)
+        return f"{prefix} {self.name}" if prefix else self.name
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -47,6 +54,8 @@ class SourceData:
     """Everything published by the operator at one point in time."""
 
     queues: dict[str, Queue]
+    # Emergency (ГАВ/СГАВ) queues by id; they only have a live status.
+    emergency: dict[int, Queue] = field(default_factory=dict)
     # Local date -> queue id -> 48 wall-clock half-hour slots.
     days: dict[date, dict[int, list[SlotKind]]] = field(default_factory=dict)
     updated: datetime | None = None
@@ -98,6 +107,27 @@ def parse_queues(rows: list[dict[str, Any]]) -> dict[str, Queue]:
     return queues
 
 
+def parse_emergency(rows: list[dict[str, Any]]) -> dict[int, Queue]:
+    """Return active emergency queues (ГАВ, СГАВ) by id."""
+    queues: dict[int, Queue] = {}
+    for row in rows:
+        if (
+            type(row.get("id")) is not int
+            or not isinstance(row.get("name"), str)
+            or not row["name"]
+            or row.get("type_id") not in EMERGENCY_QUEUE_TYPES
+        ):
+            raise ValueError("Unexpected emergency queue format")
+        if not row.get("deleted"):
+            queues[row["id"]] = Queue(
+                id=row["id"],
+                name=row["name"],
+                live_off=bool(row.get("enabled")),
+                type_id=row["type_id"],
+            )
+    return queues
+
+
 def parse_time_series(rows: list[dict[str, Any]]) -> dict[int, int]:
     """Map source slot ids to wall-clock half-hour indexes 0..47."""
     slots = {}
@@ -120,9 +150,11 @@ def parse_source(
     time_series_rows: list[dict[str, Any]],
     schedule_rows: list[dict[str, Any]],
     fetched: datetime,
+    emergency_rows: list[dict[str, Any]] | None = None,
 ) -> SourceData:
-    """Validate all three responses; any unknown shape is rejected."""
+    """Validate all responses; any unknown shape is rejected."""
     queues = parse_queues(queue_rows)
+    emergency = parse_emergency(emergency_rows or [])
     slots = parse_time_series(time_series_rows)
     queue_ids = {queue.id for queue in queues.values()}
     days: dict[date, dict[int, list[SlotKind]]] = {}
@@ -150,10 +182,17 @@ def parse_source(
             kind = SOURCE_KINDS[item["type"]]
             if PRIORITY.index(kind) > PRIORITY.index(kinds[index]):
                 kinds[index] = kind
-            if "updated_at" in item:
+            # A missing timestamp must not discard an otherwise valid schedule.
+            if isinstance(item.get("updated_at"), str):
                 stamp = _timestamp(item["updated_at"])
                 updated = stamp if updated is None else max(updated, stamp)
-    return SourceData(queues=queues, days=days, updated=updated, fetched=fetched)
+    return SourceData(
+        queues=queues,
+        emergency=emergency,
+        days=days,
+        updated=updated,
+        fetched=fetched,
+    )
 
 
 def local_midnight(day: date) -> datetime:

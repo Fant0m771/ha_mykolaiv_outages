@@ -21,25 +21,19 @@ from .entity import MykolaivEntity
 from .schedule import day_intervals, forecast, format_periods, outage_periods
 
 DAY_DESCRIPTIONS = (
-    SensorEntityDescription(
-        key="today", translation_key="today", icon="mdi:calendar-today"
-    ),
-    SensorEntityDescription(
-        key="tomorrow", translation_key="tomorrow", icon="mdi:calendar-arrow-right"
-    ),
+    SensorEntityDescription(key="today", translation_key="today"),
+    SensorEntityDescription(key="tomorrow", translation_key="tomorrow"),
 )
 FORECAST_DESCRIPTIONS = (
     SensorEntityDescription(
         key="next_outage",
         translation_key="next_outage",
         device_class=SensorDeviceClass.TIMESTAMP,
-        icon="mdi:power-plug-off",
     ),
     SensorEntityDescription(
         key="restoration",
         translation_key="restoration",
         device_class=SensorDeviceClass.TIMESTAMP,
-        icon="mdi:power-plug",
     ),
 )
 UPDATED_DESCRIPTION = SensorEntityDescription(

@@ -45,7 +45,7 @@ def automation_config(**extra):
             "use_blueprint": {
                 "path": "mykolaiv_outages/notifications.yaml",
                 "input": {
-                    "power_entity": "binary_sensor.power",
+                    "power_entity": ["binary_sensor.power", "binary_sensor.emergency"],
                     "next_outage_entity": "sensor.next_outage",
                     "schedule_entity": "event.schedule",
                     "notify_actions": SEND,
@@ -91,6 +91,7 @@ async def test_blueprint_is_valid(hass):
 async def test_blueprint_notifications(hass):
     now = dt_util.utcnow()
     hass.states.async_set("binary_sensor.power", "on")
+    hass.states.async_set("binary_sensor.emergency", "on", {"source": "emergency"})
     hass.states.async_set("sensor.next_outage", (now + timedelta(hours=1)).isoformat())
     hass.states.async_set("event.schedule", "unavailable")
     sent = await start(hass)
@@ -110,6 +111,17 @@ async def test_blueprint_notifications(hass):
     hass.states.async_set("binary_sensor.power", "on")
     await hass.async_block_till_done()
     assert sent[-1].data["title"] == "💡 Світло є"
+
+    hass.states.async_set(
+        "binary_sensor.emergency",
+        "off",
+        {"source": "emergency", "switched_off": ["ГАВ 9"]},
+    )
+    await hass.async_block_till_done()
+    assert sent[-1].data == {
+        "title": "🔌 Світло зникло",
+        "message": "Аварійне відключення (ГАВ 9). Час відновлення не публікується.",
+    }
 
     set_event(
         hass,
@@ -174,3 +186,10 @@ async def test_manual_run_sends_test_message(hass):
         "title": "🧪 Перевірка сповіщень",
         "message": "Сповіщення про відключення світла працюють.",
     }
+
+
+async def test_single_power_entity_still_valid(hass):
+    """Automations created before 0.4.0 store one entity, not a list."""
+    config = automation_config(power_entity="binary_sensor.power")
+    result = await async_validate_config_item(hass, "test", config)
+    assert result.validation_error is None, result.validation_error

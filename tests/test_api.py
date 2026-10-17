@@ -7,7 +7,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from custom_components.mykolaiv_outages.api import MykolaivApi, MykolaivApiError
 from custom_components.mykolaiv_outages.const import API_URL
 
-from .conftest import ACTIVE_URL, QUEUES_URL, TIME_SERIES_URL
+from .conftest import QUEUES_URL, mock_source
 
 
 def api(hass):
@@ -17,7 +17,10 @@ def api(hass):
 async def test_source(hass, source):
     data = await api(hass).async_get_source()
     assert data.queues["1.1"].live_off is True
-    assert source.call_count == 3
+    assert data.emergency[9].label == "ГАВ 9"
+    assert data.emergency[9].live_off is True
+    assert data.emergency[11].label == "СГАВ 1"
+    assert source.call_count == 5
 
 
 @pytest.mark.parametrize(
@@ -38,10 +41,11 @@ async def test_transport_errors(hass, aioclient_mock, kwargs, reason):
     assert err.value.reason == reason
 
 
-async def test_invalid_schedule_is_reported(hass, aioclient_mock, queues, time_series):
-    aioclient_mock.get(QUEUES_URL, json=queues)
-    aioclient_mock.get(TIME_SERIES_URL, json=time_series)
-    aioclient_mock.get(ACTIVE_URL, json=[{"from": "bad", "series": []}])
+async def test_invalid_schedule_is_reported(
+    hass, aioclient_mock, queues, time_series, emergency
+):
+    bad = [{"from": "bad", "series": []}]
+    mock_source(aioclient_mock, queues, time_series, bad, emergency)
     with pytest.raises(MykolaivApiError) as err:
         await api(hass).async_get_source()
     assert err.value.reason == "invalid"
@@ -73,16 +77,21 @@ async def test_bad_address_row(hass, aioclient_mock):
         await api(hass).async_get_branches()
 
 
-async def test_house_queues_only_schedule_type(hass, aioclient_mock):
+async def test_house_queues(hass, aioclient_mock):
     aioclient_mock.get(
         f"{API_URL}/addr/dom/25/outage-queue",
         json=[
-            {"outage": {"name": "4.2", "type_id": 3, "deleted": 0}},
-            {"outage": {"name": "7", "type_id": 1, "deleted": 0}},
-            {"outage": {"name": "1.1", "type_id": 3, "deleted": 1}},
+            {"outage": {"id": 22, "name": "4.2", "type_id": 3, "deleted": 0}},
+            {"outage": {"id": 9, "name": "9", "type_id": 1, "enabled": 1}},
+            {"outage": {"id": 14, "name": "1.1", "type_id": 3, "deleted": 1}},
+            {"outage": {"id": 99, "name": "x", "type_id": 7}},
         ],
     )
-    assert await api(hass).async_get_house_queues(25) == ["4.2"]
+    queues = await api(hass).async_get_house_queues(25)
+    assert [(q.type_id, q.label, q.live_off) for q in queues] == [
+        (3, "4.2", False),
+        (1, "ГАВ 9", True),
+    ]
 
 
 async def test_bad_house_queue_row(hass, aioclient_mock):

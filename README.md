@@ -18,6 +18,10 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 - **Schedule updated**: when the operator last changed the schedule.
 - **Outages** calendar: every outage as a calendar event, for calendar triggers with an offset.
 - **Schedule** events: `schedule_published` and `schedule_changed`, with `day` (`today`/`tomorrow`), `date` and `schedule` attributes.
+- **Power (emergency queue)**: the live status of your emergency queues (ГАВ/СГАВ). Found automatically when you set up by address, or chosen manually.
+- **Keeps working when the operator's site is down**: the published schedule stays visible for up to an hour, the live statuses become unavailable, and the **Operator site** diagnostic sensor shows the connection problem.
+- **Repairs**: if the operator moves your house to another queue (address-bound entries are checked twice a day), Settings → Repairs offers to switch with one click, keeping entities and history. A queue that disappears is reported there too.
+- **Diagnostics** download for bug reports, with your address removed.
 - One shared request every 5 minutes for all configured queues. States also update on every half-hour boundary.
 - English and Ukrainian.
 
@@ -48,7 +52,7 @@ show_tomorrow: true          # optional
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
-One automation for a queue's notifications: a warning N minutes before a scheduled outage, power lost and restored, tomorrow's schedule published and schedule changes. Each one can be switched off.
+One automation for a queue's notifications: a warning N minutes before a scheduled outage, power lost and restored (add the emergency sensor to **Power** to include emergency outages), tomorrow's schedule published and schedule changes. Each one can be switched off.
 
 In **Send notification**, add the actions that deliver them, using `{{ title }}` and `{{ message }}`. For example, to a Telegram channel through your existing Telegram bot (copy the action your other Telegram automations already use):
 
@@ -109,6 +113,10 @@ Entity IDs depend on the entry title and language; check yours under the device.
 - **Оновлення графіка**: коли обленерго востаннє змінило графік.
 - Календар **Відключення**: кожне відключення як подія календаря; тригер календаря дозволяє попередження із зсувом, наприклад за 15 хв.
 - Події **Графік**: `schedule_published` (графік опубліковано) і `schedule_changed` (графік змінено) з атрибутами `day` (`today`/`tomorrow`), `date` і `schedule`.
+- **Електропостачання (аварійна черга)**: поточний стан ваших аварійних черг (ГАВ/СГАВ); під час налаштування за адресою визначаються автоматично.
+- **Працює, коли сайт обленерго недоступний**: опублікований графік лишається до години, live-стани стають недоступними, а сенсор **Сайт обленерго** показує проблему зі з'єднанням.
+- **Ремонт**: якщо обленерго перенесе ваш будинок в іншу чергу (записи за адресою перевіряються двічі на добу), у Налаштування → Ремонт можна перейти на нову чергу одним кліком, зі збереженням сутностей та історії. Зникнення черги теж повідомляється там.
+- **Діагностика** для звітів про проблеми, без вашої адреси.
 - Один спільний запит кожні 5 хвилин для всіх черг; стани оновлюються кожні пів години.
 
 Поки графік на день не опубліковано, сенсори цього дня мають стан `unknown`. **Електропостачання** працює завжди.

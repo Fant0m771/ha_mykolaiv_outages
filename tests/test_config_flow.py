@@ -31,9 +31,10 @@ def mock_address(aioclient_mock, house_queues):
     aioclient_mock.get(
         f"{API_URL}/addr/dom/25/outage-queue",
         json=[
-            {"outage": {"name": name, "type_id": 3, "deleted": 0}}
-            for name in house_queues
-        ],
+            {"outage": {"id": 100 + index, "name": name, "type_id": 3, "deleted": 0}}
+            for index, name in enumerate(house_queues)
+        ]
+        + [{"outage": {"id": 9, "name": "9", "type_id": 1, "deleted": 0}}],
     )
 
 
@@ -74,6 +75,8 @@ async def test_address_single_queue(hass, aioclient_mock):
     assert result["data"] == {
         "queue": "4.2",
         "address": "Арбузинка, вул. Свободи, 1",
+        "house": 25,
+        "emergency": [9],
     }
     assert result["result"].unique_id == "4.2"
 

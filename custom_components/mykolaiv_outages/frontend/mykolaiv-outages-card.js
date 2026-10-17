@@ -1,5 +1,5 @@
 /* Mykolaivoblenergo Outages card: live power, countdown and day timelines. */
-const CARD_VERSION = "0.3.1";
+const CARD_VERSION = "0.4.0";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
@@ -29,6 +29,9 @@ const TEXT = {
     possible: "Power possible",
     on: "Power",
     updated: "Updated",
+    emergency_outage: "Emergency outage",
+    emergency_detail: "Emergency outages have no published end time",
+    stale: "No connection to the operator since",
     example: "Example",
     h: "h",
     min: "min",
@@ -62,6 +65,9 @@ const TEXT = {
     possible: "Можливе відключення",
     on: "Світло є",
     updated: "Оновлено",
+    emergency_outage: "Аварійне відключення",
+    emergency_detail: "Для аварійних відключень час відновлення не публікується",
+    stale: "Немає зв'язку з обленерго з",
     example: "Приклад",
     h: "год",
     min: "хв",
@@ -80,6 +86,8 @@ const KEYS = [
   "next_outage",
   "restoration",
   "last_update",
+  "emergency_power",
+  "site",
 ];
 
 function text(hass) {
@@ -251,6 +259,10 @@ class MykolaivOutagesCard extends HTMLElement {
     const today = state("today");
     const tomorrow = state("tomorrow");
     const power = state("power");
+    const emergency = state("emergency_power");
+    const site = state("site");
+    const bool = (item) =>
+      !item || ["unavailable", "unknown"].includes(item.state) ? null : item.state === "on";
     const device = this._hass.devices?.[this._config.device];
     return {
       ids,
@@ -270,6 +282,10 @@ class MykolaivOutagesCard extends HTMLElement {
       restoration: time("restoration"),
       outageContext: state("restoration")?.attributes.outage,
       updated: time("last_update"),
+      emergency: bool(emergency),
+      emergencyQueues: emergency?.attributes.switched_off || [],
+      siteOk: bool(site),
+      siteSince: site?.attributes.last_success ? new Date(site.attributes.last_success) : null,
       missing: !today && !power,
     };
   }
@@ -285,9 +301,10 @@ class MykolaivOutagesCard extends HTMLElement {
 
     const now = new Date();
     const title = escape(this._config.title || data.title || t.name);
-    const powerClass = data.power === null ? "unknown" : data.power ? "on" : "off";
-    const powerText =
-      data.power === null ? t.unknown : data.power ? t.power_on : t.power_off;
+    // An emergency switch-off means no power whatever the schedule queue says.
+    const powered = data.emergency === false ? false : data.power;
+    const powerClass = powered === null ? "unknown" : powered ? "on" : "off";
+    const powerText = powered === null ? t.unknown : powered ? t.power_on : t.power_off;
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -322,7 +339,13 @@ class MykolaivOutagesCard extends HTMLElement {
             <span><i class="possible"></i>${t.possible}</span>
             <span><i class="on"></i>${t.on}</span>
           </div>
-          ${data.updated ? `<span>${t.updated} ${clock(data.updated)}</span>` : ""}
+          ${
+            data.siteOk === false && data.siteSince
+              ? `<span class="stale" data-more="site">⚠ ${t.stale} ${clock(data.siteSince)}</span>`
+              : data.updated
+                ? `<span>${t.updated} ${clock(data.updated)}</span>`
+                : ""
+          }
         </div>
       </ha-card>`;
 
@@ -348,7 +371,14 @@ class MykolaivOutagesCard extends HTMLElement {
     let detail = "";
     let tone = "calm";
     const scheduledNow = data.outageContext === "current";
-    if (data.power === false || (scheduledNow && data.power === null)) {
+    if (data.emergency === false) {
+      tone = "alert";
+      label = t.outage_now;
+      value = `${t.emergency_outage}${
+        data.emergencyQueues.length ? ` · ${escape(data.emergencyQueues.join(", "))}` : ""
+      }`;
+      detail = t.emergency_detail;
+    } else if (data.power === false || (scheduledNow && data.power === null)) {
       tone = "alert";
       label = t.outage_now;
       if (data.restoration) {
@@ -375,7 +405,9 @@ class MykolaivOutagesCard extends HTMLElement {
       label = data.todayPublished ? t.no_outages : t.not_published;
     }
     return `
-      <div class="hero ${tone}" data-more="${tone === "alert" ? "restoration" : "next_outage"}">
+      <div class="hero ${tone}" data-more="${
+        data.emergency === false ? "emergency_power" : tone === "alert" ? "restoration" : "next_outage"
+      }">
         <div class="label">${label}</div>
         ${value ? `<div class="value">${value}</div>` : ""}
         ${detail ? `<div class="detail">${detail}</div>` : ""}
@@ -498,6 +530,7 @@ const STYLE = `
            color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
   .pending { font-size: 13px; color: var(--secondary-text-color); padding: 10px 12px; border-radius: 10px;
              border: 1px dashed var(--divider-color); }
+  .stale { color: var(--mo-possible); font-weight: 600; }
   .hint { font-size: 13px; color: var(--secondary-text-color); }
   .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px;
             font-size: 11px; color: var(--secondary-text-color); }

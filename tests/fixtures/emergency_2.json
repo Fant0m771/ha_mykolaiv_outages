@@ -1,0 +1,29 @@
+[
+ {
+  "id": 11,
+  "name": "1",
+  "type_id": 2,
+  "enabled": 0,
+  "created_at": null,
+  "updated_at": "2026-10-17T09:38:16.000000Z",
+  "deleted": 0
+ },
+ {
+  "id": 12,
+  "name": "2",
+  "type_id": 2,
+  "enabled": 0,
+  "created_at": null,
+  "updated_at": "2026-10-17T09:38:16.000000Z",
+  "deleted": 0
+ },
+ {
+  "id": 13,
+  "name": "3",
+  "type_id": 2,
+  "enabled": 0,
+  "created_at": null,
+  "updated_at": "2026-10-17T09:38:16.000000Z",
+  "deleted": 0
+ }
+]

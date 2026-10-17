@@ -11,10 +11,17 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorMode
 
 from .api import MykolaivApi, MykolaivApiError
-from .const import CONF_ADDRESS, CONF_QUEUE, DOMAIN
+from .const import (
+    CONF_ADDRESS,
+    CONF_EMERGENCY,
+    CONF_HOUSE,
+    CONF_QUEUE,
+    DOMAIN,
+    GPV_QUEUE_TYPE,
+)
 
 
-def select(choices: dict[str, str]) -> SelectSelector:
+def select(choices: dict[str, str], multiple: bool = False) -> SelectSelector:
     """Searchable dropdown that stores the exact source identifier."""
     return SelectSelector(
         {
@@ -23,6 +30,7 @@ def select(choices: dict[str, str]) -> SelectSelector:
             ],
             "mode": SelectSelectorMode.DROPDOWN,
             "sort": False,
+            "multiple": multiple,
         }
     )
 
@@ -37,6 +45,7 @@ class MykolaivConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
         self._address: list[str] = []
         self._parent: int | None = None
         self._house_queues: list[str] = []
+        self._house_emergency: list[int] = []
 
     @property
     def _api(self) -> MykolaivApi:
@@ -155,22 +164,31 @@ class MykolaivConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> ConfigFlowResult:
         """Use the house's schedule queue; ask only if the operator lists several."""
         address = ", ".join(self._address)
+        house = self._parent_id()
         if user_input is None:
             try:
-                self._house_queues = sorted(
-                    set(await self._api.async_get_house_queues(self._parent_id()))
-                )
+                queues = await self._api.async_get_house_queues(house)
             except MykolaivApiError:
                 return self.async_abort(reason="cannot_connect")
+            self._house_queues = sorted(
+                {queue.name for queue in queues if queue.type_id == GPV_QUEUE_TYPE}
+            )
+            self._house_emergency = sorted(
+                queue.id for queue in queues if queue.type_id != GPV_QUEUE_TYPE
+            )
             if not self._house_queues:
                 return self.async_abort(
                     reason="no_house_queue",
                     description_placeholders={"address": address},
                 )
             if len(self._house_queues) == 1:
-                return await self._async_finish(self._house_queues[0], address)
+                return await self._async_finish(
+                    self._house_queues[0], address, house, self._house_emergency
+                )
         elif user_input[CONF_QUEUE] in self._house_queues:
-            return await self._async_finish(user_input[CONF_QUEUE], address)
+            return await self._async_finish(
+                user_input[CONF_QUEUE], address, house, self._house_emergency
+            )
         return self.async_show_form(
             step_id="house_queue",
             data_schema=vol.Schema(
@@ -188,15 +206,29 @@ class MykolaivConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         queues: list[str] = []
+        emergency: dict[str, str] = {}
         try:
-            queues = sorted((await self._api.async_get_source()).queues)
+            source = await self._api.async_get_source()
         except MykolaivApiError:
             errors["base"] = "cannot_connect"
+        else:
+            queues = sorted(source.queues)
+            emergency = {
+                str(queue.id): queue.label
+                for queue in sorted(
+                    source.emergency.values(),
+                    key=lambda item: (item.type_id, len(item.name), item.name),
+                )
+            }
         if user_input is not None and not errors:
+            chosen = [int(key) for key in user_input.get(CONF_EMERGENCY, [])]
             if user_input[CONF_QUEUE] in queues:
-                return await self._async_finish(user_input[CONF_QUEUE], None)
+                return await self._async_finish(
+                    user_input[CONF_QUEUE], None, None, sorted(chosen)
+                )
             errors[CONF_QUEUE] = "invalid_selection"
-        default = self._entry.data[CONF_QUEUE] if self._entry else None
+        entry = self._entry.data if self._entry else {}
+        default = entry.get(CONF_QUEUE)
         return self.async_show_form(
             step_id="queue",
             data_schema=vol.Schema(
@@ -204,15 +236,34 @@ class MykolaivConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                     vol.Required(
                         CONF_QUEUE,
                         default=default if default in queues else vol.UNDEFINED,
-                    ): select({queue: queue for queue in queues})
+                    ): select({queue: queue for queue in queues}),
+                    vol.Optional(
+                        CONF_EMERGENCY,
+                        default=[
+                            str(item)
+                            for item in entry.get(CONF_EMERGENCY, [])
+                            if str(item) in emergency
+                        ],
+                    ): select(emergency, multiple=True),
                 }
             ),
             errors=errors,
         )
 
-    async def _async_finish(self, queue: str, address: str | None) -> ConfigFlowResult:
+    async def _async_finish(
+        self,
+        queue: str,
+        address: str | None,
+        house: int | None,
+        emergency: list[int],
+    ) -> ConfigFlowResult:
         await self.async_set_unique_id(queue)
-        data = {CONF_QUEUE: queue, CONF_ADDRESS: address}
+        data = {
+            CONF_QUEUE: queue,
+            CONF_ADDRESS: address,
+            CONF_HOUSE: house,
+            CONF_EMERGENCY: emergency,
+        }
         title = f"{address} (черга {queue})" if address else f"Черга {queue}"
         if self._entry is not None:
             if queue != self._entry.unique_id:

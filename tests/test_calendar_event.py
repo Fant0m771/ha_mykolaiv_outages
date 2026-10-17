@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.mykolaiv_outages.const import DOMAIN, SCAN_INTERVAL
 
-from .conftest import ACTIVE_URL, NOW, QUEUES_URL, TIME_SERIES_URL
+from .conftest import NOW, emergency_rows, mock_source
 
 TOMORROW = {
     "from": "2026-10-17T21:00:00.000000Z",
@@ -42,9 +42,7 @@ async def setup(hass, queue="1.1"):
 
 def remock(aioclient_mock, queues, time_series, active):
     aioclient_mock.clear_requests()
-    aioclient_mock.get(QUEUES_URL, json=queues)
-    aioclient_mock.get(TIME_SERIES_URL, json=time_series)
-    aioclient_mock.get(ACTIVE_URL, json=active)
+    mock_source(aioclient_mock, queues, time_series, active, emergency_rows())
 
 
 async def refresh(hass, freezer):

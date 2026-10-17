@@ -2,19 +2,33 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
-from .const import DOMAIN
-from .coordinator import MykolaivCoordinator, async_acquire, async_release
+from .const import CONF_HOUSE, DOMAIN, HOUSE_CHECK_INTERVAL
+from .coordinator import (
+    MykolaivCoordinator,
+    async_acquire,
+    async_release,
+    schedule_store,
+)
+from .repairs import (
+    async_check_house,
+    async_check_queue,
+    changed_issue,
+    missing_issue,
+)
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -51,6 +65,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) -> 
     except BaseException:
         await async_release(hass, coordinator)
         raise
+    entry.async_on_unload(
+        coordinator.async_add_listener(lambda: async_check_queue(hass, entry))
+    )
+    async_check_queue(hass, entry)
+    if entry.data.get(CONF_HOUSE):
+
+        @callback
+        def check_house(_now: datetime | None = None) -> None:
+            entry.async_create_background_task(
+                hass, async_check_house(hass, entry), f"{DOMAIN} house check"
+            )
+
+        entry.async_on_unload(
+            async_track_time_interval(hass, check_house, HOUSE_CHECK_INTERVAL)
+        )
+        check_house()
     return True
 
 
@@ -59,3 +89,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) ->
     if unloaded := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         await async_release(hass, entry.runtime_data)
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: MykolaivConfigEntry) -> None:
+    """Forget the stored schedule and any open repair issues."""
+    await schedule_store(hass, entry.entry_id).async_remove()
+    for issue in (missing_issue(entry.entry_id), changed_issue(entry.entry_id)):
+        ir.async_delete_issue(hass, DOMAIN, issue)

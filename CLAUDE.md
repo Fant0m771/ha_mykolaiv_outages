@@ -27,6 +27,10 @@ one bug (calendar description class) and one outdated README example (Telegram
   `calendar.py`, `event.py` (schedule published/changed, first refresh is the
   baseline). Shared base class in `entity.py`; entity unique IDs use the entry ID
   so reconfiguring the queue keeps entities.
+- `repairs.py`: repair issues (queue missing, house moved to another queue,
+  with a fix flow) and the twice-daily house check for address-bound entries.
+- `diagnostics.py`: config entry diagnostics; the address, house and title are
+  redacted.
 - `config_flow.py`: address lookup (branch → settlement → street → house) or
   manual queue; reconfigure; one entry per queue (unique ID = queue name).
 - `frontend/mykolaiv-outages-card.js`: bundled Lovelace card, served and
@@ -44,6 +48,8 @@ one bug (calendar description class) and one outdated README example (Telegram
   users' automations, the card and the blueprint.
 - Minimum Home Assistant is 2025.1 (`hacs.json`). Code must work on it and on
   the current release.
+- Live statuses (`power`, `emergency_power`) need fresh data; schedule-based
+  entities keep the last data for `STALE_AFTER` while the site is down.
 - Translations: every user-visible string goes into `strings.json`,
   `translations/en.json` and `translations/uk.json`.
 

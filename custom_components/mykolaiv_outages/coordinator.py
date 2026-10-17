@@ -6,11 +6,13 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_utc_time_change
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import MykolaivApi, MykolaivApiError
@@ -65,6 +67,11 @@ class MykolaivCoordinator(DataUpdateCoordinator[SourceData]):
             self._unsub_clock()
             self._unsub_clock = None
         await super().async_shutdown()
+
+
+def schedule_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    """The last schedule an entry has seen, kept across restarts."""
+    return Store(hass, 1, f"{DOMAIN}.{entry_id}.schedule")
 
 
 async def async_acquire(hass: HomeAssistant) -> MykolaivCoordinator:

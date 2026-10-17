@@ -56,7 +56,11 @@
         "title": "Queue",
         "description": "Choose the hourly schedule (GPV) queue verified for your address.",
         "data": {
-          "queue": "Queue"
+          "queue": "Queue",
+          "emergency": "Emergency queues (ГАВ/СГАВ)"
+        },
+        "data_description": {
+          "emergency": "Optional. The emergency queues your address belongs to, from the operator's lists. Found automatically when you search by address."
         }
       }
     },
@@ -79,6 +83,12 @@
       },
       "scheduled_power": {
         "name": "Power by schedule"
+      },
+      "emergency_power": {
+        "name": "Power (emergency queue)"
+      },
+      "site": {
+        "name": "Operator site"
       }
     },
     "calendar": {
@@ -127,6 +137,27 @@
       },
       "last_update": {
         "name": "Schedule updated"
+      }
+    }
+  },
+  "issues": {
+    "queue_missing": {
+      "title": "Queue {queue} no longer exists",
+      "description": "Mykolaivoblenergo no longer lists queue {queue} used by \"{title}\", so its entities are unavailable. Open the integration, choose ⋮ → Reconfigure, and find your queue by address again."
+    },
+    "queue_changed": {
+      "title": "Your house moved to queue {new}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Switch to queue {new}?",
+            "description": "Mykolaivoblenergo now lists the address of \"{title}\" in queue {new} instead of {old}. Switch this entry to queue {new}? Entities and their history are kept."
+          }
+        },
+        "abort": {
+          "already_configured": "Queue {new} is already configured in another entry. Remove one of them, then try again.",
+          "entry_removed": "This entry no longer exists."
+        }
       }
     }
   }

@@ -15,12 +15,17 @@ blueprint:
   input:
     power_entity:
       name: Power
-      description: The queue's "Power" binary sensor (Електропостачання).
+      description: >-
+        The queue's "Power" binary sensor (Електропостачання), and optionally
+        "Power (emergency queue)" (Електропостачання (аварійна черга)) to be
+        told about emergency outages too.
       selector:
         entity:
+          multiple: true
           filter:
             - integration: mykolaiv_outages
               domain: binary_sensor
+              device_class: power
     next_outage_entity:
       name: Next outage
       description: The queue's "Next outage" sensor (Наступне відключення).
@@ -128,6 +133,7 @@ variables:
     {%- set start = states(next_outage_entity) | as_datetime(none) -%}
     {%- if trigger.id is not defined -%} Сповіщення про відключення світла працюють.
     {%- elif trigger.id == 'soon' and start is not none -%} Відключення о {{ as_local(start).strftime('%H:%M') }} (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
+    {%- elif trigger.id == 'power_off' and trigger.to_state.attributes.source == 'emergency' -%} Аварійне відключення ({{ trigger.to_state.attributes.switched_off | join(', ') }}). Час відновлення не публікується.
     {%- elif trigger.id == 'power_off' -%} Обленерго повідомляє про відключення вашої черги.
     {%- elif trigger.id == 'power_on' -%} Електропостачання відновлено.
     {%- else -%} {{ event_schedule }}

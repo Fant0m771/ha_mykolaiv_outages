@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
-from .const import API_URL, GPV_QUEUE_TYPE, SITE_URL
-from .schedule import SourceData, parse_source
+from .const import API_URL, EMERGENCY_QUEUE_TYPES, GPV_QUEUE_TYPE, SITE_URL
+from .schedule import Queue, SourceData, parse_source
 
 
 class MykolaivApiError(Exception):
@@ -52,10 +52,15 @@ class MykolaivApi:
     async def async_get_source(self) -> SourceData:
         """Fetch queues, the half-hour grid and active schedules together."""
         queues = await self._async_get_list(f"outage-queue/by-type/{GPV_QUEUE_TYPE}")
+        emergency = []
+        for type_id in EMERGENCY_QUEUE_TYPES:
+            emergency += await self._async_get_list(f"outage-queue/by-type/{type_id}")
         time_series = await self._async_get_list("schedule/time-series")
         schedules = await self._async_get_list("v2/schedule/active")
         try:
-            return parse_source(queues, time_series, schedules, datetime.now(UTC))
+            return parse_source(
+                queues, time_series, schedules, datetime.now(UTC), emergency
+            )
         except ValueError as err:
             raise MykolaivApiError(str(err), reason="invalid") from err
 
@@ -91,16 +96,29 @@ class MykolaivApi:
             f"addr/street/{street}/dom", "iddom", "nazdom"
         )
 
-    async def async_get_house_queues(self, house: int) -> list[str]:
-        """Return the schedule queues the operator assigns to one house."""
+    async def async_get_house_queues(self, house: int) -> list[Queue]:
+        """Return the schedule and emergency queues the operator assigns to a house."""
         rows = await self._async_get_list(f"addr/dom/{house}/outage-queue")
         queues = []
         for row in rows:
             outage = row.get("outage")
-            if not isinstance(outage, dict) or not isinstance(outage.get("name"), str):
+            if (
+                not isinstance(outage, dict)
+                or not isinstance(outage.get("name"), str)
+                or type(outage.get("id")) is not int
+                or type(outage.get("type_id")) is not int
+            ):
                 raise MykolaivApiError(
                     "Unexpected house queue format", reason="invalid"
                 )
-            if outage.get("type_id") == GPV_QUEUE_TYPE and not outage.get("deleted"):
-                queues.append(outage["name"])
+            known = outage["type_id"] in (GPV_QUEUE_TYPE, *EMERGENCY_QUEUE_TYPES)
+            if known and not outage.get("deleted"):
+                queues.append(
+                    Queue(
+                        id=outage["id"],
+                        name=outage["name"],
+                        live_off=bool(outage.get("enabled")),
+                        type_id=outage["type_id"],
+                    )
+                )
         return queues

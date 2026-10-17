@@ -1,0 +1,36 @@
+{
+  "entity": {
+    "sensor": {
+      "today": {
+        "default": "mdi:calendar-today"
+      },
+      "tomorrow": {
+        "default": "mdi:calendar-arrow-right"
+      },
+      "next_outage": {
+        "default": "mdi:power-plug-off"
+      },
+      "restoration": {
+        "default": "mdi:power-plug"
+      }
+    },
+    "binary_sensor": {
+      "emergency_power": {
+        "default": "mdi:transmission-tower-off",
+        "state": {
+          "on": "mdi:transmission-tower"
+        }
+      }
+    },
+    "calendar": {
+      "outages": {
+        "default": "mdi:calendar-alert"
+      }
+    },
+    "event": {
+      "schedule": {
+        "default": "mdi:calendar-sync"
+      }
+    }
+  }
+}

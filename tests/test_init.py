@@ -9,9 +9,13 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.mykolaiv_outages.const import DOMAIN, SCAN_INTERVAL
+from custom_components.mykolaiv_outages.const import (
+    DOMAIN,
+    SCAN_INTERVAL,
+    STALE_AFTER,
+)
 
-from .conftest import ACTIVE_URL, NOW, QUEUES_URL, TIME_SERIES_URL
+from .conftest import NOW, QUEUES_URL, emergency_rows, mock_source
 
 
 def add_entry(hass, queue):
@@ -50,7 +54,11 @@ async def test_entities(hass, source):
         "last_update",
         "outages",
         "schedule",
+        "site",
     }
+    assert result["site"].state == "on"
+    # Manual entries without emergency queues have no emergency sensor.
+    assert "emergency_power" not in result
     assert result["power"].state == "off"
     assert result["scheduled_power"].state == "off"
     assert result["scheduled_power"].attributes["slot"] == "off"
@@ -97,11 +105,11 @@ async def test_shared_polling_and_unload(hass, source, freezer):
     await hass.async_block_till_done()
     assert second.state is ConfigEntryState.LOADED
     assert first.runtime_data is second.runtime_data
-    assert source.call_count == 3
+    assert source.call_count == 5
     freezer.tick(SCAN_INTERVAL)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert source.call_count == 6
+    assert source.call_count == 10
     assert await hass.config_entries.async_unload(first.entry_id)
     assert DOMAIN in hass.data
     assert states(hass, second)["power"].state == "on"
@@ -120,9 +128,7 @@ async def test_setup_retry_when_offline(hass, aioclient_mock):
 async def test_failure_and_recovery(
     hass, aioclient_mock, queues, time_series, active, freezer
 ):
-    aioclient_mock.get(QUEUES_URL, json=queues)
-    aioclient_mock.get(TIME_SERIES_URL, json=time_series)
-    aioclient_mock.get(ACTIVE_URL, json=active)
+    mock_source(aioclient_mock, queues, time_series, active, emergency_rows())
     entry = add_entry(hass, "1.1")
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -131,15 +137,27 @@ async def test_failure_and_recovery(
     freezer.tick(SCAN_INTERVAL)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert all(state.state == "unavailable" for state in states(hass, entry).values())
+    result = states(hass, entry)
+    # The live status is gone at once; the published schedule stays for a while.
+    assert result["power"].state == "unavailable"
+    assert result["site"].state == "off"
+    assert result["today"].state == "10:30–12:00"
+    assert result["restoration"].state != "unavailable"
+    # After STALE_AFTER without a successful request, the schedule goes too.
+    freezer.tick(STALE_AFTER)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    result = states(hass, entry)
+    assert result["today"].state == "unavailable"
+    assert result["site"].state == "off"
     aioclient_mock.clear_requests()
-    aioclient_mock.get(QUEUES_URL, json=queues)
-    aioclient_mock.get(TIME_SERIES_URL, json=time_series)
-    aioclient_mock.get(ACTIVE_URL, json=active)
+    mock_source(aioclient_mock, queues, time_series, active, emergency_rows())
     freezer.tick(SCAN_INTERVAL)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert states(hass, entry)["today"].state == "10:30–12:00"
+    result = states(hass, entry)
+    assert result["site"].state == "on"
+    assert result["power"].state != "unavailable"
 
 
 async def test_removed_queue_is_unavailable(hass, source, queues):
