@@ -50,7 +50,10 @@ type: custom:mykolaiv-outages-card
 device: <device id>          # chosen in the visual editor
 title: Home                  # optional
 show_tomorrow: true          # optional
+power_entity: binary_sensor.inverter_grid   # optional
 ```
+
+**Your own power sensor** (optional): the operator's live status sometimes lags behind reality by an hour or more. If you have a sensor that sees the grid, such as an inverter's grid input, choose it in *Your power sensor*. The card's status then follows it (`on` = power), and a note says when the operator still reports an outage. The timelines, next outage and restoration times still come from the operator.
 
 ### Notifications blueprint
 
@@ -131,7 +134,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
-Інтеграція має власну картку і сама додає її до ресурсів дашбордів, завантажувати нічого не треба: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги.
+Інтеграція має власну картку і сама додає її до ресурсів дашбордів, завантажувати нічого не треба: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги. Якщо дані обленерго запізнюються, у полі **Власний сенсор світла** оберіть сенсор, який бачить мережу (наприклад, вхід мережі інвертора): стан на картці братиметься з нього, а графіки як і раніше від обленерго.
 
 ## Development
 

@@ -2,7 +2,7 @@
 // The legacy frontend build loads this as a classic script: keep names out
 // of the global scope.
 (() => {
-const CARD_VERSION = "0.4.4";
+const CARD_VERSION = "0.5.0";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
@@ -44,6 +44,11 @@ const TEXT = {
     device: "Queue device",
     title: "Title (optional)",
     show_tomorrow: "Show tomorrow",
+    power_entity: "Your power sensor (optional)",
+    power_entity_helper:
+      "For example the inverter's grid sensor: on means power. The card's status follows it; the schedule still comes from the operator.",
+    operator_lag: "The operator still reports an outage",
+    operator_on: "The operator does not report an outage",
   },
   uk: {
     name: "Відключення Миколаївобленерго",
@@ -82,6 +87,11 @@ const TEXT = {
     device: "Пристрій черги",
     title: "Заголовок (необов'язково)",
     show_tomorrow: "Показувати завтра",
+    power_entity: "Власний сенсор світла (необов'язково)",
+    power_entity_helper:
+      "Наприклад, сенсор мережі інвертора: on означає, що світло є. Стан на картці береться з нього, графік як і раніше від обленерго.",
+    operator_lag: "Обленерго ще показує відключення",
+    operator_on: "Обленерго не повідомляє про відключення",
   },
 };
 
@@ -274,8 +284,12 @@ class MykolaivOutagesCard extends HTMLElement {
     const bool = (item) =>
       !item || ["unavailable", "unknown"].includes(item.state) ? null : item.state === "on";
     const device = this._hass.devices?.[this._config.device];
+    const localId = this._config.power_entity;
+    if (localId) ids.local = localId;
     return {
       ids,
+      // The user's own sensor (e.g. an inverter's grid input) beats the operator.
+      local: localId ? bool(this._hass.states[localId]) : null,
       // The queue has its own line, so drop the "(черга 1.1)" title suffix.
       title: (device?.name_by_user || device?.name || "").replace(/\s*\((черга|queue) [^)]*\)$/i, ""),
       queue: today?.attributes.queue,
@@ -312,15 +326,21 @@ class MykolaivOutagesCard extends HTMLElement {
 
     const now = new Date();
     const title = escape(this._config.title || data.title || t.name);
-    // An emergency switch-off means no power whatever the schedule queue says.
-    const powered = data.emergency === false ? false : data.power;
+    // An emergency switch-off means no power whatever the schedule queue says,
+    // and the user's own sensor beats both.
+    const powered =
+      data.local !== null && data.local !== undefined
+        ? data.local
+        : data.emergency === false
+          ? false
+          : data.power;
     const powerClass = powered === null ? "unknown" : powered ? "on" : "off";
     const powerText = powered === null ? t.unknown : powered ? t.power_on : t.power_off;
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
       <ha-card>
-        <div class="header" data-more="power">
+        <div class="header" data-more="${data.ids?.local ? "local" : "power"}">
           <div class="icon ${powerClass}">${powerClass === "off" ? ICON_OFF : ICON_ON}</div>
           <div class="heading">
             <div class="title">${title}</div>
@@ -396,21 +416,30 @@ class MykolaivOutagesCard extends HTMLElement {
     let detail = "";
     let tone = "calm";
     const scheduledNow = data.outageContext === "current";
-    if (data.emergency === false) {
+    const local = data.local ?? null;
+    const outage =
+      local === false ||
+      (local === null && (data.power === false || (scheduledNow && data.power === null)));
+    if (data.emergency === false && local !== true) {
       tone = "alert";
       label = t.outage_now;
       value = `${t.emergency_outage}${
         data.emergencyQueues.length ? ` · ${escape(data.emergencyQueues.join(", "))}` : ""
       }`;
       detail = t.emergency_detail;
-    } else if (data.power === false || (scheduledNow && data.power === null)) {
+    } else if (outage) {
       tone = "alert";
       label = t.outage_now;
-      if (data.restoration) {
-        value = `${t.until} ${clock(data.restoration)}`;
-        detail = `${t.back_in} ${duration(data.restoration - now, t)}`;
+      // Restoration belongs to this outage only when the schedule has one now;
+      // otherwise it is the end of the next scheduled outage.
+      const restoration = scheduledNow ? data.restoration : null;
+      if (restoration) {
+        value = `${t.until} ${clock(restoration)}`;
+        detail = `${t.back_in} ${duration(restoration - now, t)}`;
       } else {
         value = t.restore_unknown;
+        // Only the user's sensor knows about this outage.
+        if (data.power === true && data.emergency !== false) detail = t.operator_on;
       }
     } else if (scheduledNow) {
       // The schedule says off, but the operator reports power: trust the operator.
@@ -428,6 +457,10 @@ class MykolaivOutagesCard extends HTMLElement {
       if (end) detail += ` · ${t.lasts} ${duration(end - data.nextOutage, t)}`;
     } else {
       label = data.todayPublished ? t.no_outages : t.not_published;
+    }
+    // The user's sensor sees power while the operator has not caught up yet.
+    if (local === true && (data.power === false || data.emergency === false)) {
+      detail = detail ? `${detail} · ${t.operator_lag}` : t.operator_lag;
     }
     return `
       <div class="hero ${tone}" data-more="${
@@ -501,8 +534,13 @@ class MykolaivOutagesCardEditor extends HTMLElement {
       { name: "device", selector: { device: { integration: DOMAIN } } },
       { name: "title", selector: { text: {} } },
       { name: "show_tomorrow", selector: { boolean: {} } },
+      {
+        name: "power_entity",
+        selector: { entity: { domain: ["binary_sensor", "input_boolean", "switch"] } },
+      },
     ];
     this._form.computeLabel = (schema) => t[schema.name] || schema.name;
+    this._form.computeHelper = (schema) => t[`${schema.name}_helper`] || "";
   }
 }
 
