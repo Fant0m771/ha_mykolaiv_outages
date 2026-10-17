@@ -1,0 +1,102 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mykolaivoblenergo",
+        "description": "How should your hourly outage schedule queue be found?",
+        "menu_options": {
+          "branch": "Find by address",
+          "queue": "Choose the queue manually"
+        }
+      },
+      "reconfigure": {
+        "title": "Change queue",
+        "description": "Entities and history are kept.",
+        "menu_options": {
+          "branch": "Find by address",
+          "queue": "Choose the queue manually"
+        }
+      },
+      "branch": {
+        "title": "Operator branch",
+        "description": "Choose the operator branch serving your settlement.",
+        "data": {
+          "branch": "Branch"
+        }
+      },
+      "settlement": {
+        "title": "Settlement",
+        "description": "{address}",
+        "data": {
+          "settlement": "Settlement"
+        }
+      },
+      "street": {
+        "title": "Street",
+        "description": "{address}",
+        "data": {
+          "street": "Street"
+        }
+      },
+      "house": {
+        "title": "House",
+        "description": "{address}",
+        "data": {
+          "house": "House"
+        }
+      },
+      "house_queue": {
+        "title": "Queue",
+        "description": "Several queues are listed for {address}. Choose one.",
+        "data": {
+          "queue": "Queue"
+        }
+      },
+      "queue": {
+        "title": "Queue",
+        "description": "Choose the hourly schedule (GPV) queue verified for your address.",
+        "data": {
+          "queue": "Queue"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to off.energy.mk.ua.",
+      "invalid_selection": "Choose a value from the list."
+    },
+    "abort": {
+      "already_configured": "This queue is already configured.",
+      "cannot_connect": "Cannot connect to off.energy.mk.ua.",
+      "no_house_queue": "The operator lists no hourly schedule queue for {address}. Choose the queue manually.",
+      "reconfigure_successful": "The queue was changed.",
+      "empty_address": "The operator's address directory has no entries at this step. Choose the queue manually instead."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "power": {
+        "name": "Power"
+      },
+      "scheduled_power": {
+        "name": "Power by schedule"
+      }
+    },
+    "sensor": {
+      "today": {
+        "name": "Today's schedule"
+      },
+      "tomorrow": {
+        "name": "Tomorrow's schedule"
+      },
+      "next_outage": {
+        "name": "Next outage"
+      },
+      "restoration": {
+        "name": "Power restoration"
+      },
+      "last_update": {
+        "name": "Schedule updated"
+      }
+    }
+  }
+}

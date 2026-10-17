@@ -1,0 +1,7 @@
+# Minimum supported HA (2025.1) test fixture; works on Python 3.12.
+pytest-homeassistant-custom-component==0.13.205
+pytest-cov
+ruff==0.16.10
+mypy==2.4.0
+# Newer pycares leaves a resolver thread that the HA 2025.1 fixture rejects.
+pycares==4.4.0

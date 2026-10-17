@@ -1,0 +1,5 @@
+# Current HA test fixture (Python 3.13+).
+pytest-homeassistant-custom-component==0.13.370
+pytest-cov
+ruff==0.16.10
+mypy==2.4.0

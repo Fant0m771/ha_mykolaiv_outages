@@ -1,0 +1,102 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Миколаївобленерго",
+        "description": "Як визначити вашу чергу графіка погодинних відключень?",
+        "menu_options": {
+          "branch": "Знайти за адресою",
+          "queue": "Обрати чергу вручну"
+        }
+      },
+      "reconfigure": {
+        "title": "Змінити чергу",
+        "description": "Сутності та історія збережуться.",
+        "menu_options": {
+          "branch": "Знайти за адресою",
+          "queue": "Обрати чергу вручну"
+        }
+      },
+      "branch": {
+        "title": "Дільниця",
+        "description": "Оберіть дільницю обленерго, що обслуговує ваш населений пункт.",
+        "data": {
+          "branch": "Дільниця"
+        }
+      },
+      "settlement": {
+        "title": "Населений пункт",
+        "description": "{address}",
+        "data": {
+          "settlement": "Населений пункт"
+        }
+      },
+      "street": {
+        "title": "Вулиця",
+        "description": "{address}",
+        "data": {
+          "street": "Вулиця"
+        }
+      },
+      "house": {
+        "title": "Будинок",
+        "description": "{address}",
+        "data": {
+          "house": "Будинок"
+        }
+      },
+      "house_queue": {
+        "title": "Черга",
+        "description": "Для адреси {address} вказано кілька черг. Оберіть потрібну.",
+        "data": {
+          "queue": "Черга"
+        }
+      },
+      "queue": {
+        "title": "Черга",
+        "description": "Оберіть чергу ГПВ, перевірену для вашої адреси.",
+        "data": {
+          "queue": "Черга"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не вдалося з'єднатися з off.energy.mk.ua.",
+      "invalid_selection": "Оберіть значення зі списку."
+    },
+    "abort": {
+      "already_configured": "Ця черга вже налаштована.",
+      "cannot_connect": "Не вдалося з'єднатися з off.energy.mk.ua.",
+      "no_house_queue": "Обленерго не вказало черги ГПВ для адреси {address}. Оберіть чергу вручну.",
+      "reconfigure_successful": "Чергу змінено.",
+      "empty_address": "У довіднику адрес обленерго на цьому кроці немає записів. Оберіть чергу вручну."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "power": {
+        "name": "Електропостачання"
+      },
+      "scheduled_power": {
+        "name": "Електропостачання за графіком"
+      }
+    },
+    "sensor": {
+      "today": {
+        "name": "Графік на сьогодні"
+      },
+      "tomorrow": {
+        "name": "Графік на завтра"
+      },
+      "next_outage": {
+        "name": "Наступне відключення"
+      },
+      "restoration": {
+        "name": "Відновлення живлення"
+      },
+      "last_update": {
+        "name": "Оновлення графіка"
+      }
+    }
+  }
+}
