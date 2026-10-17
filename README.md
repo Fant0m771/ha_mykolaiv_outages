@@ -4,6 +4,8 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 
 [![Open your Home Assistant instance and open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Fant0m771&repository=ha_mykolaiv_outages&category=integration)
 
+[![Support via monobank](https://img.shields.io/badge/%D0%9F%D1%96%D0%B4%D1%82%D1%80%D0%B8%D0%BC%D0%B0%D1%82%D0%B8-monobank-black?logo=buymeacoffee&logoColor=white)](https://send.monobank.ua/jar/9U2n9h97ti)
+
 [**English**](#english) | [Українською](#українською)
 
 <img src="https://raw.githubusercontent.com/Fant0m771/ha_mykolaiv_outages/main/docs/images/card.png" alt="Mykolaivoblenergo Outages dashboard card" width="480">
@@ -140,5 +142,7 @@ ruff check . && ruff format --check . && mypy && pytest -q --cov
 ```
 
 Test fixtures in `tests/fixtures/` are real off.energy.mk.ua responses from 2026-10-17.
+
+If the integration is useful to you, you can buy me a coffee through [monobank](https://send.monobank.ua/jar/9U2n9h97ti) ☕
 
 This project is not affiliated with АТ «Миколаївобленерго». Data comes from its public website and may change without notice.
