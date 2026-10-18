@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.loader import async_get_loaded_integration
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_QUEUE, DOMAIN, MANUFACTURER, SITE_URL, STALE_AFTER
@@ -37,6 +38,10 @@ class MykolaivEntity(CoordinatorEntity[MykolaivCoordinator]):
             manufacturer=MANUFACTURER,
             model=f"Черга {self.queue}",
             configuration_url=SITE_URL,
+            # Shows which build runs, e.g. a develop install (X.Y.Z.devN).
+            sw_version=str(
+                async_get_loaded_integration(coordinator.hass, DOMAIN).version
+            ),
         )
 
     @property

@@ -1,8 +1,11 @@
 """Real HA setup: entities, shared polling, clock updates and unload."""
 
+import json
 from datetime import timedelta
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -165,3 +168,17 @@ async def test_removed_queue_is_unavailable(hass, source, queues):
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert states(hass, entry)["today"].state == "unavailable"
+
+
+async def test_device_shows_installed_version(hass, source):
+    """The device page tells a develop install (X.Y.Z.devN) from a release."""
+    manifest = (
+        Path(__file__).parents[1] / "custom_components" / DOMAIN / "manifest.json"
+    )
+    version = json.loads(manifest.read_text())["version"]
+    entry = add_entry(hass, "1.1")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    assert device.sw_version == version
+    assert await hass.config_entries.async_unload(entry.entry_id)
