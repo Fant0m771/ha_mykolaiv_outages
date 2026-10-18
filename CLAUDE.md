@@ -87,6 +87,15 @@ To let the user test a pushed `develop` build on their HA:
 The card URL carries the version and a hash of the card file, so a new card on
 `develop` reaches browsers without a version bump.
 
+The user switches builds on their dashboard «Світло та енергія», tab «Розробка».
+- Its buttons run `script.mykolaiv_outages_install_develop` and
+  `script.mykolaiv_outages_install_release`.
+- Each one calls `update.install` on `update.mykolaivoblenergo_outages_update`
+  and then restarts HA.
+- The device's `sw_version` (the manifest version, `X.Y.Z.devN` on `develop`) is
+  the reliable way to see what runs. HACS forgets a branch install after a restart
+  and shows the last release again.
+
 When the user approves, merge `develop` into `main` (fast-forward), then follow
 Releases. HACS then offers the release, which replaces the develop install.
 
