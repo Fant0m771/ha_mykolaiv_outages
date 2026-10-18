@@ -2,7 +2,7 @@
 // The legacy frontend build loads this as a classic script: keep names out
 // of the global scope.
 (() => {
-const CARD_VERSION = "0.5.2.dev0";
+const CARD_VERSION = "0.5.2";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
