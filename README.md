@@ -31,6 +31,23 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 
 When the operator has not published a schedule for a day, that day's sensors are `unknown`. **Power** keeps working regardless.
 
+### Created entities
+
+One device per queue, with these entities (names follow your Home Assistant language; entity IDs depend on the entry title):
+
+| Type | Name | State | Attributes |
+|---|---|---|---|
+| Binary sensor | **Power** | `off` while the operator reports your queue switched off (live) | `source` |
+| Binary sensor | **Power by schedule** | whether the current half hour has power in the published schedule | `source`, `slot` (`on` / `off` / `confirmed` / `possible`) |
+| Binary sensor | **Power (emergency queue)** | `off` while one of your emergency queues (ГАВ/СГАВ) is switched off. Only with emergency queues | `queues`, `switched_off` |
+| Sensor | **Today's schedule** / **Tomorrow's schedule** | outage periods, e.g. `10:30–12:00; 16:30–19:00`; `unknown` until published | `queue`, `date`, `published`, `outages`, `periods` (with `kind`) |
+| Sensor (timestamp) | **Next outage** | start of the next outage within the published schedule | `queue`, `outage` |
+| Sensor (timestamp) | **Power restoration** | end of the current or next outage; `unknown` if beyond the schedule | `queue`, `outage` (`current` / `next` / `none`) |
+| Sensor (timestamp, diagnostic) | **Schedule updated** | when the operator last changed the schedule | `fetched` |
+| Binary sensor (diagnostic) | **Operator site** | connection to off.energy.mk.ua | `last_success` |
+| Calendar | **Outages** | an event for every outage | |
+| Event | **Schedule** | `schedule_published`, `schedule_changed` | `day`, `date`, `schedule` |
+
 ### Installation
 
 **HACS**: HACS → ⋮ → Custom repositories → add this repository as *Integration* → install **Mykolaivoblenergo Outages** → restart Home Assistant.
@@ -127,6 +144,21 @@ Entity IDs depend on the entry title and language; check yours under the device.
 - Один спільний запит кожні 5 хвилин для всіх черг; стани оновлюються кожні пів години.
 
 Поки графік на день не опубліковано, сенсори цього дня мають стан `unknown`. **Електропостачання** працює завжди.
+
+**Сутності** (по пристрою на кожну чергу; назви залежать від мови Home Assistant, `entity_id` від назви запису):
+
+| Тип | Назва | Стан | Атрибути |
+|---|---|---|---|
+| Бінарний сенсор | **Електропостачання** | `off`, поки обленерго показує, що вашу чергу вимкнено | `source` |
+| Бінарний сенсор | **Електропостачання за графіком** | чи є світло в поточному пів-годинному слоті графіка | `source`, `slot` |
+| Бінарний сенсор | **Електропостачання (аварійна черга)** | `off`, поки вимкнено одну з ваших аварійних черг (ГАВ/СГАВ); лише якщо вони є | `queues`, `switched_off` |
+| Сенсор | **Графік на сьогодні** / **на завтра** | періоди відключень; `unknown`, поки не опубліковано | `queue`, `date`, `published`, `outages`, `periods` |
+| Сенсор (час) | **Наступне відключення** | початок наступного відключення в межах графіка | `queue`, `outage` |
+| Сенсор (час) | **Відновлення живлення** | кінець поточного чи наступного відключення | `queue`, `outage` (`current` / `next` / `none`) |
+| Сенсор (час, діагностика) | **Оновлення графіка** | коли обленерго востаннє змінило графік | `fetched` |
+| Бінарний сенсор (діагностика) | **Сайт обленерго** | зв'язок з off.energy.mk.ua | `last_success` |
+| Календар | **Відключення** | подія на кожне відключення | |
+| Подія | **Графік** | `schedule_published`, `schedule_changed` | `day`, `date`, `schedule` |
 
 Встановлення: через HACS (custom repository, тип *Integration*) або скопіюйте `custom_components/mykolaiv_outages` у `config/custom_components/` і перезапустіть Home Assistant. Далі: Налаштування → Пристрої та служби → Додати інтеграцію → **Mykolaivoblenergo Outages**.
 

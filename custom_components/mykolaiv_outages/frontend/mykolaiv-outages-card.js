@@ -2,7 +2,7 @@
 // The legacy frontend build loads this as a classic script: keep names out
 // of the global scope.
 (() => {
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.5.1";
 const DOMAIN = "mykolaiv_outages";
 const TIME_ZONE = "Europe/Kyiv";
 
@@ -49,6 +49,8 @@ const TEXT = {
       "For example the inverter's grid sensor: on means power. The card's status follows it; the schedule still comes from the operator.",
     operator_lag: "The operator still reports an outage",
     operator_on: "The operator does not report an outage",
+    summary_off: "Outage",
+    summary_possible: "Possible outage",
   },
   uk: {
     name: "Відключення Миколаївобленерго",
@@ -92,6 +94,8 @@ const TEXT = {
       "Наприклад, сенсор мережі інвертора: on означає, що світло є. Стан на картці береться з нього, графік як і раніше від обленерго.",
     operator_lag: "Обленерго ще показує відключення",
     operator_on: "Обленерго не повідомляє про відключення",
+    summary_off: "Відключення",
+    summary_possible: "Можливе відключення",
   },
 };
 
@@ -155,6 +159,22 @@ function toSlot(value) {
   return h * 2 + (m >= 30 ? 1 : 0);
 }
 
+/** "17:00–19:30, 21:00–22:00" per kind: planned and confirmed outages merge. */
+function periodSummary(periods) {
+  const ranges = { off: [], possible: [] };
+  const sorted = [...(periods || [])].sort((a, b) => toSlot(a.start) - toSlot(b.start));
+  for (const period of sorted) {
+    const group = period.kind === "possible" ? "possible" : period.kind === "on" ? null : "off";
+    if (!group) continue;
+    const list = ranges[group];
+    const last = list[list.length - 1];
+    if (last && last.end === period.start) last.end = period.end;
+    else list.push({ start: period.start, end: period.end });
+  }
+  const text = (list) => list.map((range) => `${range.start}–${range.end}`).join(", ");
+  return { off: text(ranges.off), possible: text(ranges.possible) };
+}
+
 /** 48 half-hour kinds from the sensor's "periods" attribute. */
 function slotsFromPeriods(periods) {
   const slots = Array(48).fill("on");
@@ -163,6 +183,21 @@ function slotsFromPeriods(periods) {
     for (let i = toSlot(period.start); i < end; i++) slots[i] = period.kind;
   }
   return slots;
+}
+
+function slotTime(index) {
+  return index === 48 ? "24:00" : `${String(Math.floor(index / 2)).padStart(2, "0")}:${index % 2 ? "30" : "00"}`;
+}
+
+/** Periods from 48 half-hour kinds (the card picker preview has slots only). */
+function periodsFromSlots(slots) {
+  const periods = [];
+  slots.forEach((kind, index) => {
+    const last = periods[periods.length - 1];
+    if (last && last.kind === kind && last.end === slotTime(index)) last.end = slotTime(index + 1);
+    else periods.push({ start: slotTime(index), end: slotTime(index + 1), kind });
+  });
+  return periods;
 }
 
 function demoData(t) {
@@ -195,6 +230,8 @@ function demoData(t) {
     todayPublished: true,
     tomorrow,
     tomorrowPublished: true,
+    todaySummary: periodSummary(periodsFromSlots(today)),
+    tomorrowSummary: periodSummary(periodsFromSlots(tomorrow)),
     nextOutage: upcoming ? at(start * 30) : null,
     restoration: upcoming ? at(end * 30) : null,
     outageContext: upcoming ? "next" : "none",
@@ -298,8 +335,10 @@ class MykolaivOutagesCard extends HTMLElement {
           ? null
           : power.state === "on",
       today: slotsFromPeriods(today?.attributes.periods),
+      todaySummary: periodSummary(today?.attributes.periods),
       todayPublished: Boolean(today?.attributes.published) && today.state !== "unavailable",
       tomorrow: slotsFromPeriods(tomorrow?.attributes.periods),
+      tomorrowSummary: periodSummary(tomorrow?.attributes.periods),
       tomorrowPublished:
         Boolean(tomorrow?.attributes.published) && tomorrow.state !== "unavailable",
       nextOutage: time("next_outage"),
@@ -351,7 +390,7 @@ class MykolaivOutagesCard extends HTMLElement {
         </div>
         ${data.missing ? `<div class="hint">${t.pick_device}</div>` : this._hero(data, t, now)}
         ${this._emergencyRow(data, t)}
-        ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now)}
+        ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary)}
         ${
           this._config.show_tomorrow === false
             ? ""
@@ -362,6 +401,7 @@ class MykolaivOutagesCard extends HTMLElement {
                 data.tomorrowPublished,
                 t,
                 null,
+                data.tomorrowSummary,
               )
         }
         <div class="footer">
@@ -472,7 +512,7 @@ class MykolaivOutagesCard extends HTMLElement {
       </div>`;
   }
 
-  _timeline(name, date, slots, published, t, now) {
+  _timeline(name, date, slots, published, t, now, summary) {
     const head = `<div class="day"><span>${name}</span><span class="date">${date}</span></div>`;
     if (!published) {
       return `<div class="timeline">${head}<div class="pending">${t.tomorrow_pending}</div></div>`;
@@ -497,6 +537,18 @@ class MykolaivOutagesCard extends HTMLElement {
         ${head}
         <div class="bar">${cells}${marker}</div>
         <div class="ticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+        ${this._summary(summary, t)}
+      </div>`;
+  }
+
+  _summary(summary, t) {
+    if (!summary || (!summary.off && !summary.possible)) return "";
+    const line = (kind, label, ranges) =>
+      ranges ? `<div class="${kind}"><i></i><span>${label}: <b>${escape(ranges)}</b></span></div>` : "";
+    return `
+      <div class="summary">
+        ${line("off", t.summary_off, summary.off)}
+        ${line("possible", t.summary_possible, summary.possible)}
       </div>`;
   }
 }
@@ -633,6 +685,13 @@ const STYLE = `
   .emergency.unknown i { background: var(--secondary-text-color); }
   .emergency.unknown .status { color: var(--secondary-text-color); }
   .hint { font-size: 13px; color: var(--secondary-text-color); }
+  .summary { display: flex; flex-direction: column; gap: 2px; margin-top: 6px;
+             font-size: 12px; color: var(--secondary-text-color); }
+  .summary div { display: flex; align-items: baseline; gap: 6px; }
+  .summary i { width: 8px; height: 8px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+  .summary .off i { background: var(--mo-off); }
+  .summary .possible i { background: var(--mo-possible); }
+  .summary b { color: var(--primary-text-color); font-weight: 600; }
   .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px;
             font-size: 11px; color: var(--secondary-text-color); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
