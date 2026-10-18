@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 from homeassistant.setup import async_setup_component
 
-from custom_components.mykolaiv_outages.card import CARD_FILE, CARD_URL
+from custom_components.mykolaiv_outages.card import CARD_FILE, CARD_URL, card_digest
 from custom_components.mykolaiv_outages.const import DOMAIN
 
 from .test_init import add_entry
 
 VERSION = json.loads((CARD_FILE.parents[1] / "manifest.json").read_text())["version"]
-URL = f"{CARD_URL}?v={VERSION}"
+URL = f"{CARD_URL}?v={VERSION}-{card_digest()}"
 
 
 @pytest.fixture

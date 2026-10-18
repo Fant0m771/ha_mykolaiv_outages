@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -18,6 +19,11 @@ _LOGGER = logging.getLogger(__name__)
 CARD_FILE = Path(__file__).parent / "frontend" / "mykolaiv-outages-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILE.name}"
 DATA_CARD_URL = f"{DOMAIN}_card_url"
+
+
+def card_digest() -> str:
+    """Short hash of the card file, so an unreleased card change reaches browsers."""
+    return hashlib.sha256(CARD_FILE.read_bytes()).hexdigest()[:8]
 
 
 def _resources(hass: HomeAssistant) -> ResourceStorageCollection | None:
@@ -39,9 +45,11 @@ async def async_register_card(hass: HomeAssistant) -> None:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(CARD_FILE), True)]
     )
-    # The version query makes browsers fetch the card again after an update.
+    # The query makes browsers fetch the card again after an update; the hash
+    # covers builds that share a version, e.g. installs from the develop branch.
     version = (await async_get_integration(hass, DOMAIN)).version
-    url = f"{CARD_URL}?v={version}"
+    digest = await hass.async_add_executor_job(card_digest)
+    url = f"{CARD_URL}?v={version}-{digest}"
     hass.data[DATA_CARD_URL] = url
     if await async_ensure_resource(hass):
         return

@@ -72,11 +72,36 @@ and the HACS action; a change is done only when CI is green. Card changes should
 also be rendered in headless Chrome with a fake `hass` (see the skill's field
 notes, section 4).
 
+## Branches and testing on the user's Home Assistant
+
+- `main` holds releases only; HACS users get tagged releases from it.
+- `develop` is where work lands first. Commit and push changes there; CI runs on
+  every push.
+
+To let the user test a pushed `develop` build on their HA:
+
+1. Install it with the HA MCP tool
+   `ha_manage_hacs(action="download", repository_id="Fant0m771/ha_mykolaiv_outages", version="develop")`.
+2. Ask before restarting HA: it is the user's live system.
+
+The card URL carries the version and a hash of the card file, so a new card on
+`develop` reaches browsers without a version bump.
+
+When the user approves, merge `develop` into `main` (fast-forward), then follow
+Releases. HACS then offers the release, which replaces the develop install.
+
+Fast path without pushing, for quick iterations: `scripts/deploy_local.sh` rsyncs
+the working tree over SSH (`~/.ssh/config` host `ha`, key from 1Password).
+- It stamps the manifest with `X.Y.Z.dev<timestamp>`.
+- It runs `ha core check` and `ha core restart`.
+- Use `--no-restart` for card-only edits.
+- Ask before restarting.
+
 ## Releases
 
 1. Bump `version` in `manifest.json` and `CARD_VERSION` in the card (the version
    also busts the card's browser cache).
-2. Commit, push, wait for green CI.
+2. Merge `develop` into `main`, push, wait for green CI.
 3. Annotated tag `vX.Y.Z` on that commit, push the tag, then create a GitHub
    release with English and Ukrainian notes. HACS only offers releases, and
    renders the README from the release tag.
