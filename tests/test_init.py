@@ -179,6 +179,7 @@ async def test_device_shows_installed_version(hass, source):
     entry = add_entry(hass, "1.1")
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    # async_get_device is deprecated on current HA; this works on 2025.1 too.
+    [device] = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
     assert device.sw_version == version
     assert await hass.config_entries.async_unload(entry.entry_id)
