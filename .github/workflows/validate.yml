@@ -3,6 +3,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  # The release workflow runs it on the tag before publishing.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -17,6 +23,8 @@ jobs:
             requirements: requirements-dev.txt
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -29,11 +37,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: home-assistant/actions/hassfest@master
   hacs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: hacs/action@main
         with:
           category: integration
