@@ -23,7 +23,7 @@ Home Assistant integration for АТ «Миколаївобленерго» hourl
 - **Outages** calendar: every outage as a calendar event, for calendar triggers with an offset.
 - **Schedule** events: `schedule_published` and `schedule_changed`, with `day` (`today`/`tomorrow`), `date` and `schedule` attributes.
 - **Power (emergency queue)**: the live status of your emergency queues (ГАВ/СГАВ). Found automatically when you set up by address, or chosen manually.
-- **Keeps working when the operator's site is down**: the published schedule stays visible for up to an hour, the live statuses become unavailable, and the **Operator site** diagnostic sensor shows the connection problem.
+- **Keeps working when the operator's site is down**: the last published schedule stays until its last published day is over (attribute `cached: true` on the schedule entities), the live statuses become unavailable, and the **Operator site** diagnostic sensor shows the connection problem. Corrections the operator publishes meanwhile arrive once the site answers again.
 - **Repairs**: if the operator moves your house to another queue (address-bound entries are checked twice a day), Settings → Repairs offers to switch with one click, keeping entities and history. A queue that disappears is reported there too.
 - **Diagnostics** download for bug reports, with your address removed.
 - One shared request every 5 minutes for all configured queues. States also update on every half-hour boundary.
@@ -38,14 +38,14 @@ One device per queue, with these entities (names follow your Home Assistant lang
 | Type | Name | State | Attributes |
 |---|---|---|---|
 | Binary sensor | **Power** | `off` while the operator reports your queue switched off (live) | `source` |
-| Binary sensor | **Power by schedule** | whether the current half hour has power in the published schedule | `source`, `slot` (`on` / `off` / `confirmed` / `possible`) |
+| Binary sensor | **Power by schedule** | whether the current half hour has power in the published schedule | `source`, `slot` (`on` / `off` / `confirmed` / `possible`), `cached` |
 | Binary sensor | **Power (emergency queue)** | `off` while one of your emergency queues (ГАВ/СГАВ) is switched off. Only with emergency queues | `queues`, `switched_off` |
-| Sensor | **Today's schedule** / **Tomorrow's schedule** | outage periods, e.g. `10:30–12:00; 16:30–19:00`; `unknown` until published | `queue`, `date`, `published`, `outages`, `periods` (with `kind`) |
-| Sensor (timestamp) | **Next outage** | start of the next outage within the published schedule | `queue`, `outage` |
-| Sensor (timestamp) | **Power restoration** | end of the current or next outage; `unknown` if beyond the schedule | `queue`, `outage` (`current` / `next` / `none`) |
-| Sensor (timestamp, diagnostic) | **Schedule updated** | when the operator last changed the schedule | `fetched` |
+| Sensor | **Today's schedule** / **Tomorrow's schedule** | outage periods, e.g. `10:30–12:00; 16:30–19:00`; `unknown` until published | `queue`, `cached`, `date`, `published`, `outages`, `periods` (with `kind`) |
+| Sensor (timestamp) | **Next outage** | start of the next outage within the published schedule | `queue`, `outage`, `cached` |
+| Sensor (timestamp) | **Power restoration** | end of the current or next outage; `unknown` if beyond the schedule | `queue`, `outage` (`current` / `next` / `none`), `cached` |
+| Sensor (timestamp, diagnostic) | **Schedule updated** | when the operator last changed the schedule | `fetched`, `cached` |
 | Binary sensor (diagnostic) | **Operator site** | connection to off.energy.mk.ua | `last_success` |
-| Calendar | **Outages** | an event for every outage | |
+| Calendar | **Outages** | an event for every outage | `cached` |
 | Event | **Schedule** | `schedule_published`, `schedule_changed` | `day`, `date`, `schedule` |
 
 ### Installation
@@ -138,7 +138,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 - Календар **Відключення**: кожне відключення як подія календаря; тригер календаря дозволяє попередження із зсувом, наприклад за 15 хв.
 - Події **Графік**: `schedule_published` (графік опубліковано) і `schedule_changed` (графік змінено) з атрибутами `day` (`today`/`tomorrow`), `date` і `schedule`.
 - **Електропостачання (аварійна черга)**: поточний стан ваших аварійних черг (ГАВ/СГАВ); під час налаштування за адресою визначаються автоматично.
-- **Працює, коли сайт обленерго недоступний**: опублікований графік лишається до години, live-стани стають недоступними, а сенсор **Сайт обленерго** показує проблему зі з'єднанням.
+- **Працює, коли сайт обленерго недоступний**: останній опублікований графік лишається, доки не мине його останній опублікований день (атрибут `cached: true` у сутностей графіка), live-стани стають недоступними, а сенсор **Сайт обленерго** показує проблему зі з'єднанням.
 - **Ремонт**: якщо обленерго перенесе ваш будинок в іншу чергу (записи за адресою перевіряються двічі на добу), у Налаштування → Ремонт можна перейти на нову чергу одним кліком, зі збереженням сутностей та історії. Зникнення черги теж повідомляється там.
 - **Діагностика** для звітів про проблеми, без вашої адреси.
 - Один спільний запит кожні 5 хвилин для всіх черг; стани оновлюються кожні пів години.
@@ -150,14 +150,14 @@ Entity IDs depend on the entry title and language; check yours under the device.
 | Тип | Назва | Стан | Атрибути |
 |---|---|---|---|
 | Бінарний сенсор | **Електропостачання** | `off`, поки обленерго показує, що вашу чергу вимкнено | `source` |
-| Бінарний сенсор | **Електропостачання за графіком** | чи є світло в поточному пів-годинному слоті графіка | `source`, `slot` |
+| Бінарний сенсор | **Електропостачання за графіком** | чи є світло в поточному пів-годинному слоті графіка | `source`, `slot`, `cached` |
 | Бінарний сенсор | **Електропостачання (аварійна черга)** | `off`, поки вимкнено одну з ваших аварійних черг (ГАВ/СГАВ); лише якщо вони є | `queues`, `switched_off` |
-| Сенсор | **Графік на сьогодні** / **на завтра** | періоди відключень; `unknown`, поки не опубліковано | `queue`, `date`, `published`, `outages`, `periods` |
-| Сенсор (час) | **Наступне відключення** | початок наступного відключення в межах графіка | `queue`, `outage` |
-| Сенсор (час) | **Відновлення живлення** | кінець поточного чи наступного відключення | `queue`, `outage` (`current` / `next` / `none`) |
-| Сенсор (час, діагностика) | **Оновлення графіка** | коли обленерго востаннє змінило графік | `fetched` |
+| Сенсор | **Графік на сьогодні** / **на завтра** | періоди відключень; `unknown`, поки не опубліковано | `queue`, `cached`, `date`, `published`, `outages`, `periods` |
+| Сенсор (час) | **Наступне відключення** | початок наступного відключення в межах графіка | `queue`, `outage`, `cached` |
+| Сенсор (час) | **Відновлення живлення** | кінець поточного чи наступного відключення | `queue`, `outage` (`current` / `next` / `none`), `cached` |
+| Сенсор (час, діагностика) | **Оновлення графіка** | коли обленерго востаннє змінило графік | `fetched`, `cached` |
 | Бінарний сенсор (діагностика) | **Сайт обленерго** | зв'язок з off.energy.mk.ua | `last_success` |
-| Календар | **Відключення** | подія на кожне відключення | |
+| Календар | **Відключення** | подія на кожне відключення | `cached` |
 | Подія | **Графік** | `schedule_published`, `schedule_changed` | `day`, `date`, `schedule` |
 
 Встановлення: через HACS (custom repository, тип *Integration*) або скопіюйте `custom_components/mykolaiv_outages` у `config/custom_components/` і перезапустіть Home Assistant. Далі: Налаштування → Пристрої та служби → Додати інтеграцію → **Mykolaivoblenergo Outages**.

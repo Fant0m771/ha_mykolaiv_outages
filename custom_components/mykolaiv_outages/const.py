@@ -17,9 +17,6 @@ SCAN_INTERVAL: Final = timedelta(minutes=5)
 GPV_QUEUE_TYPE: Final = 3
 EMERGENCY_QUEUE_TYPES: Final = {1: "ГАВ", 2: "СГАВ"}
 
-# Keep showing the last published schedule this long while the site is down.
-# Live statuses become unavailable at once.
-STALE_AFTER: Final = timedelta(hours=1)
 # How often an address-bound entry checks the house's queues.
 HOUSE_CHECK_INTERVAL: Final = timedelta(hours=12)
 

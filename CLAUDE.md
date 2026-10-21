@@ -53,7 +53,8 @@ one bug (calendar description class) and one outdated README example (Telegram
 - Minimum Home Assistant is 2025.1 (`hacs.json`). Code must work on it and on
   the current release.
 - Live statuses (`power`, `emergency_power`) need fresh data; schedule-based
-  entities keep the last data for `STALE_AFTER` while the site is down.
+  entities keep the last data while the site is down, until its last published
+  day is over, and say so with `cached: true`. Dates are never shifted.
 - Translations: every user-visible string goes into `strings.json`,
   `translations/en.json` and `translations/uk.json`.
 

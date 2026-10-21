@@ -9,7 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.loader import async_get_loaded_integration
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_QUEUE, DOMAIN, MANUFACTURER, SITE_URL, STALE_AFTER
+from .const import CONF_QUEUE, DOMAIN, MANUFACTURER, SITE_URL, TIME_ZONE
 from .coordinator import MykolaivCoordinator
 
 
@@ -18,7 +18,8 @@ class MykolaivEntity(CoordinatorEntity[MykolaivCoordinator]):
 
     _attr_has_entity_name = True
     # Entities showing the operator's live status need fresh data; schedule
-    # entities keep the last published schedule for STALE_AFTER.
+    # entities keep the last published schedule while the site is down, until
+    # its last published day is over.
     _live = False
 
     def __init__(
@@ -46,10 +47,23 @@ class MykolaivEntity(CoordinatorEntity[MykolaivCoordinator]):
 
     @property
     def available(self) -> bool:
-        """The queue must still exist; old data only while it is still recent."""
+        """The queue must still exist; old data only while its schedule is current."""
         data = self.coordinator.data
         if data is None or self.queue not in data.queues:
             return False
         if self.coordinator.last_update_success:
             return True
-        return not self._live and dt_util.utcnow() - data.fetched < STALE_AFTER
+        if self._live:
+            return False
+        # Dates are absolute: a kept "tomorrow" becomes today after midnight,
+        # nothing is shifted or extended past what was published.
+        today = dt_util.utcnow().astimezone(TIME_ZONE).date()
+        return any(
+            day >= today and data.slots(self.queue, day) is not None
+            for day in data.days
+        )
+
+    @property
+    def cached(self) -> bool:
+        """The last request failed and the state comes from an earlier response."""
+        return not self.coordinator.last_update_success

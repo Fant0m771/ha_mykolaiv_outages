@@ -91,6 +91,7 @@ class MykolaivDaySensor(MykolaivEntity, SensorEntity):
         intervals = day_intervals(slots, day) if slots else []
         return {
             "queue": self.queue,
+            "cached": self.cached,
             "date": day.isoformat(),
             "published": slots is not None,
             "outages": [
@@ -127,7 +128,7 @@ class MykolaivForecastSensor(MykolaivEntity, SensorEntity):
         context = "unknown"
         if result is not None:
             context = "current" if result.current else "next" if result.next else "none"
-        return {"queue": self.queue, "outage": context}
+        return {"queue": self.queue, "outage": context, "cached": self.cached}
 
 
 class MykolaivUpdateSensor(MykolaivEntity, SensorEntity):
@@ -139,4 +140,7 @@ class MykolaivUpdateSensor(MykolaivEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {"fetched": self.coordinator.data.fetched.isoformat()}
+        return {
+            "fetched": self.coordinator.data.fetched.isoformat(),
+            "cached": self.cached,
+        }

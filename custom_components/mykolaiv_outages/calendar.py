@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from homeassistant.components.calendar import (
     CalendarEntity,
@@ -74,6 +75,10 @@ class MykolaivCalendar(MykolaivEntity, CalendarEntity):
                 )
             )
         return events
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"cached": self.cached}
 
     @property
     def event(self) -> CalendarEvent | None:

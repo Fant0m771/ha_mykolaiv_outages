@@ -89,7 +89,7 @@ class MykolaivScheduledPower(MykolaivEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {"source": "schedule", "slot": self._slot}
+        return {"source": "schedule", "slot": self._slot, "cached": self.cached}
 
 
 class MykolaivEmergencyPower(MykolaivEntity, BinarySensorEntity):

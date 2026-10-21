@@ -1,7 +1,7 @@
 """Real HA setup: entities, shared polling, clock updates and unload."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntryState
@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.mykolaiv_outages.const import (
     DOMAIN,
     SCAN_INTERVAL,
-    STALE_AFTER,
+    TIME_ZONE,
 )
 
 from .conftest import NOW, QUEUES_URL, emergency_rows, mock_source
@@ -141,18 +141,20 @@ async def test_failure_and_recovery(
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     result = states(hass, entry)
-    # The live status is gone at once; the published schedule stays for a while.
+    # The live status is gone at once; the published schedule stays, marked.
     assert result["power"].state == "unavailable"
     assert result["site"].state == "off"
     assert result["today"].state == "10:30–12:00"
+    assert result["today"].attributes["cached"] is True
     assert result["restoration"].state != "unavailable"
-    # After STALE_AFTER without a successful request, the schedule goes too.
-    freezer.tick(STALE_AFTER)
+    assert result["outages"].attributes["cached"] is True
+    # Hours later the site is still down: the schedule of today is still there.
+    freezer.tick(timedelta(hours=6))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     result = states(hass, entry)
-    assert result["today"].state == "unavailable"
-    assert result["site"].state == "off"
+    assert result["today"].state == "10:30–12:00"
+    assert result["scheduled_power"].state != "unavailable"
     aioclient_mock.clear_requests()
     mock_source(aioclient_mock, queues, time_series, active, emergency_rows())
     freezer.tick(SCAN_INTERVAL)
@@ -161,6 +163,35 @@ async def test_failure_and_recovery(
     result = states(hass, entry)
     assert result["site"].state == "on"
     assert result["power"].state != "unavailable"
+    assert result["today"].attributes["cached"] is False
+
+
+async def test_cached_schedule_ends_with_its_last_day(
+    hass, aioclient_mock, queues, time_series, active, freezer
+):
+    mock_source(aioclient_mock, queues, time_series, active, emergency_rows())
+    entry = add_entry(hass, "1.1")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    published = sorted(entry.runtime_data.data.days)
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(QUEUES_URL, status=500)
+    # Shortly before the end of the last published day the schedule is kept.
+    last = datetime.combine(published[-1], datetime.min.time(), TIME_ZONE)
+    freezer.move_to(last + timedelta(hours=23, minutes=50))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    result = states(hass, entry)
+    assert result["today"].state != "unavailable"
+    assert result["today"].attributes["date"] == published[-1].isoformat()
+    # Once that day is over nothing is left to show; dates are not shifted.
+    freezer.tick(timedelta(minutes=15))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    result = states(hass, entry)
+    assert result["today"].state == "unavailable"
+    assert result["outages"].state == "unavailable"
+    assert result["site"].state == "off"
 
 
 async def test_removed_queue_is_unavailable(hass, source, queues):
