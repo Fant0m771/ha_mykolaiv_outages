@@ -24,7 +24,10 @@ const TEXT = {
     not_published: "Schedule not published yet",
     no_schedules: "No outage schedules in effect",
     no_schedules_detail: "The operator applies no hourly schedules now",
-    no_schedule_day: "No schedule",
+    no_schedule_days: "No schedules today or tomorrow",
+    no_schedule_today: "No schedule today",
+    elapsed: "Passed",
+    checked: "Checked",
     lasts: "lasts",
     in: "in",
     today: "Today",
@@ -72,7 +75,10 @@ const TEXT = {
     not_published: "Графік ще не опубліковано",
     no_schedules: "Графіків відключень немає",
     no_schedules_detail: "Обленерго зараз не застосовує погодинні графіки",
-    no_schedule_day: "Графіка немає",
+    no_schedule_days: "Сьогодні й завтра графіків немає",
+    no_schedule_today: "Сьогодні графіка немає",
+    elapsed: "Минуло",
+    checked: "Перевірено",
     lasts: "триватиме",
     in: "через",
     today: "Сьогодні",
@@ -384,12 +390,9 @@ class MykolaivOutagesCard extends HTMLElement {
           : data.power;
     const powerClass = powered === null ? "unknown" : powered ? "on" : "off";
     const powerText = powered === null ? t.unknown : powered ? t.power_on : t.power_off;
-    // An unpublished day reads "no schedule" while the operator, reachable,
-    // applies none.
-    const pending =
-      data.schedulesActive === false && data.siteOk !== false
-        ? t.no_schedule_day
-        : t.tomorrow_pending;
+    // The operator, reachable, applies no schedule: one line instead of two
+    // empty days.
+    const noSchedules = data.schedulesActive === false && data.siteOk !== false;
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -405,9 +408,13 @@ class MykolaivOutagesCard extends HTMLElement {
         </div>
         ${data.missing ? `<div class="hint">${t.pick_device}</div>` : this._hero(data, t, now)}
         ${this._emergencyRow(data, t)}
-        ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary, pending)}
         ${
-          this._config.show_tomorrow === false
+          noSchedules
+            ? this._unscheduled(dayLabel(now, t, this._hass), t, now)
+            : this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary)
+        }
+        ${
+          noSchedules || this._config.show_tomorrow === false
             ? ""
             : this._timeline(
                 t.tomorrow,
@@ -417,22 +424,28 @@ class MykolaivOutagesCard extends HTMLElement {
                 t,
                 null,
                 data.tomorrowSummary,
-                pending,
               )
         }
         <div class="footer">
           <div class="legend">
-            <span><i class="off"></i>${t.off}</span>
-            <span><i class="confirmed"></i>${t.confirmed}</span>
-            <span><i class="possible"></i>${t.possible}</span>
-            <span><i class="on"></i>${t.on}</span>
+            ${
+              noSchedules
+                ? `<span><i class="elapsed"></i>${t.elapsed}</span>
+                   <span><i class="unknown"></i>${t.unknown}</span>`
+                : `<span><i class="off"></i>${t.off}</span>
+                   <span><i class="confirmed"></i>${t.confirmed}</span>
+                   <span><i class="possible"></i>${t.possible}</span>
+                   <span><i class="on"></i>${t.on}</span>`
+            }
           </div>
           ${
             data.siteOk === false && data.siteSince
               ? `<span class="stale" data-more="site">⚠ ${t.stale} ${clock(data.siteSince)}</span>`
               : data.updated
                 ? `<span>${t.updated} ${clock(data.updated)}</span>`
-                : ""
+                : data.siteSince
+                  ? `<span data-more="site">${t.checked} ${clock(data.siteSince)}</span>`
+                  : ""
           }
         </div>
       </ha-card>`;
@@ -519,6 +532,7 @@ class MykolaivOutagesCard extends HTMLElement {
       data.siteOk !== false
     ) {
       // The operator reports power and has no schedule for any queue.
+      tone = "calm good";
       label = t.no_schedules;
       detail = t.no_schedules_detail;
     } else {
@@ -538,10 +552,10 @@ class MykolaivOutagesCard extends HTMLElement {
       </div>`;
   }
 
-  _timeline(name, date, slots, published, t, now, summary, pending) {
+  _timeline(name, date, slots, published, t, now, summary) {
     const head = `<div class="day"><span>${name}</span><span class="date">${date}</span></div>`;
     if (!published) {
-      return `<div class="timeline">${head}<div class="pending">${pending}</div></div>`;
+      return `<div class="timeline">${head}<div class="pending">${t.tomorrow_pending}</div></div>`;
     }
     const current = now ? kyivMinutes(now) / 1440 : null;
     const cells = slots
@@ -564,6 +578,23 @@ class MykolaivOutagesCard extends HTMLElement {
         <div class="bar">${cells}${marker}</div>
         <div class="ticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
         ${this._summary(summary, t)}
+      </div>`;
+  }
+
+  _unscheduled(date, t, now) {
+    // Without a schedule only the passing of the day is known: passed slots
+    // are plain, the rest is unknown. Never drawn as power.
+    const label = this._config.show_tomorrow === false ? t.no_schedule_today : t.no_schedule_days;
+    const current = kyivMinutes(now) / 1440;
+    const cells = Array.from({ length: 48 }, (_, i) => {
+      const passed = (i + 1) / 48 <= current;
+      return `<div class="cell ${passed ? "elapsed" : "unknown"}" title="${passed ? t.elapsed : t.unknown}"></div>`;
+    }).join("");
+    return `
+      <div class="timeline">
+        <div class="day"><span>${label}</span><span class="date">${date}</span></div>
+        <div class="bar">${cells}<div class="now" style="left:${(current * 100).toFixed(2)}%"></div></div>
+        <div class="ticks"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       </div>`;
   }
 
@@ -675,6 +706,7 @@ const STYLE = `
   .hero { border-radius: 14px; padding: 12px 14px; background: var(--secondary-background-color); }
   .hero.alert { background: var(--mo-off-14); }
   .hero.next { background: var(--mo-possible-14); }
+  .hero.good { background: var(--mo-on-16); }
   .hero .label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
                  color: var(--secondary-text-color); }
   .hero .value { font-size: 22px; font-weight: 700; margin-top: 2px; color: var(--primary-text-color);
@@ -691,6 +723,10 @@ const STYLE = `
   .cell.confirmed { background: var(--mo-off); }
   .cell.possible { background: var(--mo-possible-75); }
   .cell.past { opacity: .35; }
+  /* No schedule: passed time is plain, the rest is unknown (hatched). */
+  .cell.elapsed, .legend i.elapsed { background: var(--secondary-text-color); opacity: .3; }
+  .cell.unknown, .legend i.unknown { background: repeating-linear-gradient(-45deg,
+      var(--divider-color) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--divider-color); }
   .now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px;
          background: var(--primary-text-color); box-shadow: 0 0 0 2px var(--card-background-color, #fff); }
   .ticks { display: flex; justify-content: space-between; font-size: 10px; margin-top: 3px;
