@@ -49,7 +49,8 @@ jobs:
             | awk 'body && /^-----BEGIN (PGP|SSH) SIGNATURE-----$/ { exit } body { print } /^$/ { body = 1 }' > notes.md
           cat notes.md
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TAG" --notes-file notes.md
+            # A release whose tag was deleted and pushed again is a draft.
+            gh release edit "$TAG" --title "$TAG" --notes-file notes.md --draft=false --latest
           else
             gh release create "$TAG" --title "$TAG" --notes-file notes.md --verify-tag --latest
           fi
