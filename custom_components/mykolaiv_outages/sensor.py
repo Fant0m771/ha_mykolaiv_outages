@@ -94,6 +94,8 @@ class MykolaivDaySensor(MykolaivEntity, SensorEntity):
             "cached": self.cached,
             "date": day.isoformat(),
             "published": slots is not None,
+            # False when the operator has no active schedule for any queue.
+            "schedules_active": bool(self.coordinator.data.days),
             "outages": [
                 {"start": _clock(start), "end": _clock(end, True)}
                 for start, end in outage_periods(intervals)

@@ -40,7 +40,7 @@ One device per queue, with these entities (names follow your Home Assistant lang
 | Binary sensor | **Power** | `off` while the operator reports your queue switched off (live) | `source` |
 | Binary sensor | **Power by schedule** | whether the current half hour has power in the published schedule | `source`, `slot` (`on` / `off` / `confirmed` / `possible`), `cached` |
 | Binary sensor | **Power (emergency queue)** | `off` while one of your emergency queues (ГАВ/СГАВ) is switched off. Only with emergency queues | `queues`, `switched_off` |
-| Sensor | **Today's schedule** / **Tomorrow's schedule** | outage periods, e.g. `10:30–12:00; 16:30–19:00`; `unknown` until published | `queue`, `cached`, `date`, `published`, `outages`, `periods` (with `kind`) |
+| Sensor | **Today's schedule** / **Tomorrow's schedule** | outage periods, e.g. `10:30–12:00; 16:30–19:00`; `unknown` until published | `queue`, `cached`, `date`, `published`, `schedules_active` (`false` while the operator applies no schedule to any queue), `outages`, `periods` (with `kind`) |
 | Sensor (timestamp) | **Next outage** | start of the next outage within the published schedule | `queue`, `outage`, `cached` |
 | Sensor (timestamp) | **Power restoration** | end of the current or next outage; `unknown` if beyond the schedule | `queue`, `outage` (`current` / `next` / `none`), `cached` |
 | Sensor (timestamp, diagnostic) | **Schedule updated** | when the operator last changed the schedule | `fetched`, `cached` |
@@ -60,7 +60,7 @@ Then go to Settings → Devices & services → Add integration → **Mykolaivobl
 
 The integration ships its own card and adds it to the dashboard resources itself (Settings → Dashboards → ⋮ → Resources), so there is nothing to download. With dashboards in YAML mode it is loaded on every page instead. Edit a dashboard → **Add card** → **By card** → **Mykolaivoblenergo Outages** (under *Community cards*), then choose your queue device.
 
-It shows the live power status, a countdown to the next outage or to restoration, and half-hour timelines for today and tomorrow with a "now" marker.
+It shows the live power status, a countdown to the next outage or to restoration, and half-hour timelines for today and tomorrow with a "now" marker. While the operator reports power and applies no hourly schedule to any queue, it says **No outage schedules in effect** instead of "Schedule not published yet".
 
 ```yaml
 type: custom:mykolaiv-outages-card
@@ -152,7 +152,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 | Бінарний сенсор | **Електропостачання** | `off`, поки обленерго показує, що вашу чергу вимкнено | `source` |
 | Бінарний сенсор | **Електропостачання за графіком** | чи є світло в поточному пів-годинному слоті графіка | `source`, `slot`, `cached` |
 | Бінарний сенсор | **Електропостачання (аварійна черга)** | `off`, поки вимкнено одну з ваших аварійних черг (ГАВ/СГАВ); лише якщо вони є | `queues`, `switched_off` |
-| Сенсор | **Графік на сьогодні** / **на завтра** | періоди відключень; `unknown`, поки не опубліковано | `queue`, `cached`, `date`, `published`, `outages`, `periods` |
+| Сенсор | **Графік на сьогодні** / **на завтра** | періоди відключень; `unknown`, поки не опубліковано | `queue`, `cached`, `date`, `published`, `schedules_active` (`false`, коли обленерго не застосовує графіки до жодної черги), `outages`, `periods` |
 | Сенсор (час) | **Наступне відключення** | початок наступного відключення в межах графіка | `queue`, `outage`, `cached` |
 | Сенсор (час) | **Відновлення живлення** | кінець поточного чи наступного відключення | `queue`, `outage` (`current` / `next` / `none`), `cached` |
 | Сенсор (час, діагностика) | **Оновлення графіка** | коли обленерго востаннє змінило графік | `fetched`, `cached` |
@@ -166,7 +166,7 @@ Entity IDs depend on the entry title and language; check yours under the device.
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FFant0m771%2Fha_mykolaiv_outages%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fmykolaiv_outages%2Fnotifications.yaml)
 
-Інтеграція має власну картку і сама додає її до ресурсів дашбордів, завантажувати нічого не треба: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги. Якщо дані обленерго запізнюються, у полі **Власний сенсор світла** оберіть сенсор, який бачить мережу (наприклад, вхід мережі інвертора): стан на картці братиметься з нього, а графіки як і раніше від обленерго.
+Інтеграція має власну картку і сама додає її до ресурсів дашбордів, завантажувати нічого не треба: Редагувати дашборд → **Додати картку** → **За карткою** → **Відключення Миколаївобленерго** (розділ *Community cards*) і оберіть пристрій черги. Якщо дані обленерго запізнюються, у полі **Власний сенсор світла** оберіть сенсор, який бачить мережу (наприклад, вхід мережі інвертора): стан на картці братиметься з нього, а графіки як і раніше від обленерго. Коли обленерго повідомляє, що світло є, і не застосовує погодинні графіки до жодної черги, картка пише **Графіків відключень немає** замість «Графік ще не опубліковано».
 
 ## Development
 

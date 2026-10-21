@@ -74,6 +74,8 @@ async def test_entities(hass, source):
     }
     assert result["tomorrow"].state == "unknown"
     assert result["tomorrow"].attributes["published"] is False
+    # Today has a schedule, so schedules are in effect even for unpublished days.
+    assert result["tomorrow"].attributes["schedules_active"] is True
     assert result["next_outage"].state == "unknown"
     assert result["restoration"].state == "2026-10-17T09:00:00+00:00"
     assert result["restoration"].attributes["outage"] == "current"
@@ -192,6 +194,20 @@ async def test_cached_schedule_ends_with_its_last_day(
     assert result["today"].state == "unavailable"
     assert result["outages"].state == "unavailable"
     assert result["site"].state == "off"
+
+
+async def test_no_active_schedules(hass, aioclient_mock, queues, time_series):
+    """The operator applies no schedule to any queue: days say so explicitly."""
+    mock_source(aioclient_mock, queues, time_series, [], emergency_rows())
+    entry = add_entry(hass, "1.1")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    result = states(hass, entry)
+    for key in ("today", "tomorrow"):
+        assert result[key].state == "unknown"
+        assert result[key].attributes["published"] is False
+        assert result[key].attributes["schedules_active"] is False
+    assert result["scheduled_power"].state == "unknown"
 
 
 async def test_removed_queue_is_unavailable(hass, source, queues):

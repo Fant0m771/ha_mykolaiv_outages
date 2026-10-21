@@ -22,6 +22,9 @@ const TEXT = {
     next_outage: "Next outage",
     no_outages: "No outages scheduled",
     not_published: "Schedule not published yet",
+    no_schedules: "No outage schedules in effect",
+    no_schedules_detail: "The operator applies no hourly schedules now",
+    no_schedule_day: "No schedule",
     lasts: "lasts",
     in: "in",
     today: "Today",
@@ -67,6 +70,9 @@ const TEXT = {
     next_outage: "Наступне відключення",
     no_outages: "Відключень не заплановано",
     not_published: "Графік ще не опубліковано",
+    no_schedules: "Графіків відключень немає",
+    no_schedules_detail: "Обленерго зараз не застосовує погодинні графіки",
+    no_schedule_day: "Графіка немає",
     lasts: "триватиме",
     in: "через",
     today: "Сьогодні",
@@ -337,6 +343,9 @@ class MykolaivOutagesCard extends HTMLElement {
       today: slotsFromPeriods(today?.attributes.periods),
       todaySummary: periodSummary(today?.attributes.periods),
       todayPublished: Boolean(today?.attributes.published) && today.state !== "unavailable",
+      // Only an explicit false: older builds and unavailable sensors lack it.
+      schedulesActive:
+        today && today.state !== "unavailable" ? today.attributes.schedules_active : undefined,
       tomorrow: slotsFromPeriods(tomorrow?.attributes.periods),
       tomorrowSummary: periodSummary(tomorrow?.attributes.periods),
       tomorrowPublished:
@@ -375,6 +384,12 @@ class MykolaivOutagesCard extends HTMLElement {
           : data.power;
     const powerClass = powered === null ? "unknown" : powered ? "on" : "off";
     const powerText = powered === null ? t.unknown : powered ? t.power_on : t.power_off;
+    // An unpublished day reads "no schedule" while the operator, reachable,
+    // applies none.
+    const pending =
+      data.schedulesActive === false && data.siteOk !== false
+        ? t.no_schedule_day
+        : t.tomorrow_pending;
 
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -390,7 +405,7 @@ class MykolaivOutagesCard extends HTMLElement {
         </div>
         ${data.missing ? `<div class="hint">${t.pick_device}</div>` : this._hero(data, t, now)}
         ${this._emergencyRow(data, t)}
-        ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary)}
+        ${this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary, pending)}
         ${
           this._config.show_tomorrow === false
             ? ""
@@ -402,6 +417,7 @@ class MykolaivOutagesCard extends HTMLElement {
                 t,
                 null,
                 data.tomorrowSummary,
+                pending,
               )
         }
         <div class="footer">
@@ -495,6 +511,16 @@ class MykolaivOutagesCard extends HTMLElement {
         : clock(data.nextOutage);
       detail = `${t.in} ${duration(data.nextOutage - now, t)}`;
       if (end) detail += ` · ${t.lasts} ${duration(end - data.nextOutage, t)}`;
+    } else if (
+      !data.todayPublished &&
+      data.schedulesActive === false &&
+      data.power === true &&
+      local !== false &&
+      data.siteOk !== false
+    ) {
+      // The operator reports power and has no schedule for any queue.
+      label = t.no_schedules;
+      detail = t.no_schedules_detail;
     } else {
       label = data.todayPublished ? t.no_outages : t.not_published;
     }
@@ -512,10 +538,10 @@ class MykolaivOutagesCard extends HTMLElement {
       </div>`;
   }
 
-  _timeline(name, date, slots, published, t, now, summary) {
+  _timeline(name, date, slots, published, t, now, summary, pending) {
     const head = `<div class="day"><span>${name}</span><span class="date">${date}</span></div>`;
     if (!published) {
-      return `<div class="timeline">${head}<div class="pending">${t.tomorrow_pending}</div></div>`;
+      return `<div class="timeline">${head}<div class="pending">${pending}</div></div>`;
     }
     const current = now ? kyivMinutes(now) / 1440 : null;
     const cells = slots
