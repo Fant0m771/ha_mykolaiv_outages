@@ -26,7 +26,9 @@ const TEXT = {
     no_schedules_detail: "The operator applies no hourly schedules now",
     no_schedule_days: "No schedules today or tomorrow",
     no_schedule_today: "No schedule today",
-    elapsed: "Passed",
+    elapsed: "No data",
+    was_on: "Power was on",
+    was_off: "Power was off",
     checked: "Checked",
     lasts: "lasts",
     in: "in",
@@ -77,7 +79,9 @@ const TEXT = {
     no_schedules_detail: "Обленерго зараз не застосовує погодинні графіки",
     no_schedule_days: "Сьогодні й завтра графіків немає",
     no_schedule_today: "Сьогодні графіка немає",
-    elapsed: "Минуло",
+    elapsed: "Немає даних",
+    was_on: "Світло було",
+    was_off: "Світла не було",
     checked: "Перевірено",
     lasts: "триватиме",
     in: "через",
@@ -335,7 +339,7 @@ class MykolaivOutagesCard extends HTMLElement {
     const device = this._hass.devices?.[this._config.device];
     const localId = this._config.power_entity;
     if (localId) ids.local = localId;
-    return {
+    const result = {
       ids,
       // The user's own sensor (e.g. an inverter's grid input) beats the operator.
       local: localId ? bool(this._hass.states[localId]) : null,
@@ -367,6 +371,76 @@ class MykolaivOutagesCard extends HTMLElement {
       siteSince: site?.attributes.last_success ? new Date(site.attributes.last_success) : null,
       missing: !today && !power,
     };
+    // Without a schedule the passed part of today shows what really happened,
+    // from the recorder: the user's sensor, else the operator's status.
+    if (result.schedulesActive === false && result.siteOk !== false) {
+      result.actual = this._actualSlots(localId || ids.power, new Date());
+    }
+    return result;
+  }
+
+  _actualSlots(id, now) {
+    if (!id) return null;
+    const midnight = now.getTime() - kyivMinutes(now) * 60000 - (now.getTime() % 60000);
+    const changed = this._hass.states[id]?.last_changed;
+    const cache = this._powerHistory;
+    const fresh =
+      cache &&
+      cache.id === id &&
+      cache.midnight === midnight &&
+      cache.changed === changed &&
+      now - cache.fetched < 1800000;
+    if (!fresh && !this._historyLoading) this._loadHistory(id, midnight, changed);
+    if (!cache || cache.id !== id || cache.midnight !== midnight) return null;
+    const passed = Math.floor(kyivMinutes(now) / 30);
+    const states = cache.states;
+    return Array.from({ length: passed }, (_, i) => {
+      const from = midnight + i * 1800000;
+      const to = from + 1800000;
+      let on = 0;
+      const off = [];
+      states.forEach((item, k) => {
+        const start = Math.max(item.start, from);
+        const end = Math.min(k + 1 < states.length ? states[k + 1].start : now.getTime(), to);
+        if (end <= start) return;
+        if (item.state === "on") on += end - start;
+        else if (item.state === "off") off.push(`${clock(new Date(start))}–${clock(new Date(end))}`);
+      });
+      if (off.length) return { kind: "was-off", off: off.join(", ") };
+      // Short gaps such as an HA restart are tolerated; longer ones
+      // (unavailable, HA not running) leave the slot without data.
+      return { kind: on >= 1500000 ? "was-on" : "elapsed" };
+    });
+  }
+
+  _loadHistory(id, midnight, changed) {
+    this._historyLoading = true;
+    const done = (states) => {
+      this._powerHistory = { id, midnight, changed, fetched: Date.now(), states };
+      this._historyLoading = false;
+      this._renderKey = "";
+      this._render();
+    };
+    this._hass
+      .callWS({
+        type: "history/history_during_period",
+        start_time: new Date(midnight).toISOString(),
+        entity_ids: [id],
+        include_start_time_state: true,
+        significant_changes_only: false,
+        minimal_response: true,
+        no_attributes: true,
+      })
+      .then((response) =>
+        done(
+          (response?.[id] || []).map((item) => ({
+            state: item.s,
+            // Compressed states: lc is left out when it equals lu (seconds).
+            start: Math.max(midnight, (item.lc ?? item.lu) * 1000),
+          })),
+        ),
+      )
+      .catch(() => done([]));
   }
 
   _render() {
@@ -410,7 +484,7 @@ class MykolaivOutagesCard extends HTMLElement {
         ${this._emergencyRow(data, t)}
         ${
           noSchedules
-            ? this._unscheduled(dayLabel(now, t, this._hass), t, now)
+            ? this._unscheduled(dayLabel(now, t, this._hass), t, now, data.actual)
             : this._timeline(t.today, dayLabel(now, t, this._hass), data.today, data.todayPublished, t, now, data.todaySummary)
         }
         ${
@@ -430,7 +504,19 @@ class MykolaivOutagesCard extends HTMLElement {
           <div class="legend">
             ${
               noSchedules
-                ? `<span><i class="elapsed"></i>${t.elapsed}</span>
+                ? `${[
+                    ["was-on", t.was_on],
+                    ["was-off", t.was_off],
+                    ["elapsed", t.elapsed],
+                  ]
+                    // Only what the bar shows; passed slots without history are "elapsed".
+                    .filter(([kind]) =>
+                      data.actual
+                        ? data.actual.some((slot) => slot.kind === kind)
+                        : kind === "elapsed",
+                    )
+                    .map(([kind, label]) => `<span><i class="${kind}"></i>${label}</span>`)
+                    .join("")}
                    <span><i class="unknown"></i>${t.unknown}</span>`
                 : `<span><i class="off"></i>${t.off}</span>
                    <span><i class="confirmed"></i>${t.confirmed}</span>
@@ -581,14 +667,20 @@ class MykolaivOutagesCard extends HTMLElement {
       </div>`;
   }
 
-  _unscheduled(date, t, now) {
-    // Without a schedule only the passing of the day is known: passed slots
-    // are plain, the rest is unknown. Never drawn as power.
+  _unscheduled(date, t, now, actual) {
+    // Without a schedule the passed slots show the recorded power, or no data;
+    // the rest of the day is unknown and never drawn as power.
     const label = this._config.show_tomorrow === false ? t.no_schedule_today : t.no_schedule_days;
     const current = kyivMinutes(now) / 1440;
     const cells = Array.from({ length: 48 }, (_, i) => {
-      const passed = (i + 1) / 48 <= current;
-      return `<div class="cell ${passed ? "elapsed" : "unknown"}" title="${passed ? t.elapsed : t.unknown}"></div>`;
+      const range = `${slotTime(i)}–${i === 47 ? "24:00" : slotTime(i + 1)}`;
+      if ((i + 1) / 48 > current) {
+        return `<div class="cell unknown" title="${range} · ${t.unknown}"></div>`;
+      }
+      const slot = actual?.[i] || { kind: "elapsed" };
+      const note =
+        slot.kind === "was-off" ? `${t.was_off} ${slot.off}` : slot.kind === "was-on" ? t.was_on : t.elapsed;
+      return `<div class="cell ${slot.kind}" title="${range} · ${note}"></div>`;
     }).join("");
     return `
       <div class="timeline">
@@ -725,6 +817,8 @@ const STYLE = `
   .cell.past { opacity: .35; }
   /* No schedule: passed time is plain, the rest is unknown (hatched). */
   .cell.elapsed, .legend i.elapsed { background: var(--secondary-text-color); opacity: .3; }
+  .cell.was-on, .legend i.was-on { background: var(--mo-on); opacity: .55; }
+  .cell.was-off, .legend i.was-off { background: var(--mo-off-70); }
   .cell.unknown, .legend i.unknown { background: repeating-linear-gradient(-45deg,
       var(--divider-color) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--divider-color); }
   .now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px;
