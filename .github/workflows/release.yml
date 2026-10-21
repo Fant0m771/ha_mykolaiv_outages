@@ -43,8 +43,11 @@ jobs:
           grep -q "const CARD_VERSION = \"$version\";" custom_components/mykolaiv_outages/frontend/mykolaiv-outages-card.js || { echo "::error::CARD_VERSION is not $version"; exit 1; }
       - name: Publish
         run: |
-          # Subject and body leave out the tag's signature.
-          git for-each-ref "refs/tags/$TAG" --format='%(contents:subject)%0a%0a%(contents:body)' > notes.md
+          # The tag message as written: drop the tag headers and the signature.
+          # (%(contents:subject) would fold the first paragraph into one line.)
+          git cat-file tag "$TAG" \
+            | awk 'body && /^-----BEGIN (PGP|SSH) SIGNATURE-----$/ { exit } body { print } /^$/ { body = 1 }' > notes.md
+          cat notes.md
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release edit "$TAG" --title "$TAG" --notes-file notes.md
           else
