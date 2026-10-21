@@ -112,9 +112,14 @@ the working tree over SSH (`~/.ssh/config` host `ha`, key from 1Password).
 1. Bump `version` in `manifest.json` and `CARD_VERSION` in the card (the version
    also busts the card's browser cache).
 2. Merge `develop` into `main`, push, wait for green CI.
-3. Annotated tag `vX.Y.Z` on that commit, push the tag, then create a GitHub
-   release with English and Ukrainian notes. HACS only offers releases, and
-   renders the README from the release tag.
+3. Signed annotated tag `vX.Y.Z` on that commit with the English and Ukrainian
+   notes as its message, keeping the `###` headings:
+   `git tag -s -a vX.Y.Z --cleanup=verbatim -F notes.md`, then push the tag.
+4. `.github/workflows/release.yml` runs Validate on the tag, checks that the tag
+   is annotated, on `main` and matches `manifest.json` and `CARD_VERSION`, and
+   publishes the GitHub release with the tag message as notes. HACS only offers
+   releases, and renders the README from the release tag. For a tag pushed
+   earlier, run the workflow by hand (*Run workflow*, input `tag`).
 
 Commits are signed through the 1Password SSH agent; if signing fails, ask the
 user to unlock 1Password rather than disabling signing.

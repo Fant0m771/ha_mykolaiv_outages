@@ -1,0 +1,56 @@
+name: Release
+# Publishes a GitHub release for a pushed vX.Y.Z tag; HACS only offers releases.
+# The notes are the tag's annotation (create it with --cleanup=verbatim so the
+# "### English" headings survive). Run it by hand for a tag pushed before.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag, e.g. v0.5.3
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+    with:
+      ref: ${{ inputs.tag || github.ref_name }}
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - name: Check the tag
+        run: |
+          # The checkout may leave a lightweight copy of the tag; read the annotated one.
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          test "$(git cat-file -t "$TAG")" = tag || { echo "::error::$TAG is not an annotated tag"; exit 1; }
+          git merge-base --is-ancestor "$TAG^{commit}" origin/main || { echo "::error::$TAG is not on main"; exit 1; }
+          version=$(jq -r .version custom_components/mykolaiv_outages/manifest.json)
+          test "v$version" = "$TAG" || { echo "::error::manifest.json has $version, the tag is $TAG"; exit 1; }
+          grep -q "const CARD_VERSION = \"$version\";" custom_components/mykolaiv_outages/frontend/mykolaiv-outages-card.js || { echo "::error::CARD_VERSION is not $version"; exit 1; }
+      - name: Publish
+        run: |
+          # The tag message as written: drop the tag headers and the signature.
+          # (%(contents:subject) would fold the first paragraph into one line.)
+          git cat-file tag "$TAG" \
+            | awk 'body && /^-----BEGIN (PGP|SSH) SIGNATURE-----$/ { exit } body { print } /^$/ { body = 1 }' > notes.md
+          cat notes.md
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # A release whose tag was deleted and pushed again is a draft.
+            gh release edit "$TAG" --title "$TAG" --notes-file notes.md --draft=false --latest
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file notes.md --verify-tag --latest
+          fi
