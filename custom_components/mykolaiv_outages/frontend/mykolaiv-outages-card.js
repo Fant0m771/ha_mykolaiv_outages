@@ -815,22 +815,23 @@ const STYLE = `
   .cell.confirmed { background: var(--mo-off); }
   .cell.possible { background: var(--mo-possible-75); }
   .cell.past { opacity: .35; }
-  /* No schedule: passed time is plain, the rest is unknown (hatched). */
+  /* No schedule: passed time is plain, the rest is unknown (hatched).
+     --mo-divider (hatching and outlines) is left unset so a theme or card-mod can set it. */
   .cell.elapsed, .legend i.elapsed { background: var(--secondary-text-color); opacity: .3; }
   .cell.was-on, .legend i.was-on { background: var(--mo-on); opacity: .55; }
   .cell.was-off, .legend i.was-off { background: var(--mo-off-70); }
   .cell.unknown, .legend i.unknown { background: repeating-linear-gradient(-45deg,
-      var(--divider-color) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--divider-color); }
+      var(--mo-divider, rgba(76, 175, 80, 0.6)) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--mo-divider, rgba(76, 175, 80, 0.6)); }
   .now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px;
          background: var(--primary-text-color); box-shadow: 0 0 0 2px var(--card-background-color, #fff); }
   .ticks { display: flex; justify-content: space-between; font-size: 10px; margin-top: 3px;
            color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
   .pending { font-size: 13px; color: var(--secondary-text-color); padding: 10px 12px; border-radius: 10px;
-             border: 1px dashed var(--divider-color); }
+             border: 1px dashed var(--mo-divider, rgba(76, 175, 80, 0.6)); }
   .stale { color: var(--mo-possible); font-weight: 600; }
   .emergency { display: flex; align-items: center; justify-content: space-between; gap: 8px;
                padding: 8px 12px; border-radius: 10px; font-size: 13px;
-               border: 1px solid var(--divider-color); color: var(--primary-text-color); }
+               border: 1px solid var(--mo-divider, rgba(76, 175, 80, 0.6)); color: var(--primary-text-color); }
   .emergency .queues { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
   .emergency i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--mo-on); }
   .emergency .status { font-weight: 600; color: var(--mo-on); white-space: nowrap; }
