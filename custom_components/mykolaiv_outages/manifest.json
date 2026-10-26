@@ -15,5 +15,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Fant0m771/ha_mykolaiv_outages/issues",
   "requirements": [],
-  "version": "0.5.5.dev0"
+  "version": "0.5.5"
 }
