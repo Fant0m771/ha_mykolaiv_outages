@@ -40,6 +40,8 @@ const TEXT = {
     possible: "Power possible",
     on: "Power",
     updated: "Updated",
+    fetched: "checked",
+    refresh: "Check the operator for a new schedule now",
     emergency_outage: "Emergency outage",
     emergency_detail: "Emergency outages have no published end time",
     emergency_queues: "Emergency queues",
@@ -93,6 +95,8 @@ const TEXT = {
     possible: "Можливе відключення",
     on: "Світло є",
     updated: "Оновлено",
+    fetched: "перевірено",
+    refresh: "Перевірити зараз, чи є новий графік",
     emergency_outage: "Аварійне відключення",
     emergency_detail: "Для аварійних відключень час відновлення не публікується",
     emergency_queues: "Аварійні черги",
@@ -364,6 +368,11 @@ class MykolaivOutagesCard extends HTMLElement {
       restoration: time("restoration"),
       outageContext: state("restoration")?.attributes.outage,
       updated: time("last_update"),
+      // When the integration last asked the operator, unlike `updated` (when
+      // the operator last changed the schedule).
+      fetched: state("last_update")?.attributes.fetched
+        ? new Date(state("last_update").attributes.fetched)
+        : null,
       emergency: bool(emergency),
       emergencyQueues: emergency?.attributes.switched_off || [],
       emergencyAll: emergency?.attributes.queues || [],
@@ -448,7 +457,7 @@ class MykolaivOutagesCard extends HTMLElement {
     if (!this._config || (this._config.device && !this._hass)) return;
     const t = text(this._hass);
     const data = this._data();
-    const key = JSON.stringify([data, t === TEXT.uk, this._config]);
+    const key = JSON.stringify([data, t === TEXT.uk, this._config, Boolean(this._refreshing)]);
     if (key === this._renderKey) return;
     this._renderKey = key;
 
@@ -524,17 +533,31 @@ class MykolaivOutagesCard extends HTMLElement {
                    <span><i class="on"></i>${t.on}</span>`
             }
           </div>
-          ${
-            data.siteOk === false && data.siteSince
-              ? `<span class="stale" data-more="site">⚠ ${t.stale} ${clock(data.siteSince)}</span>`
-              : data.updated
-                ? `<span>${t.updated} ${clock(data.updated)}</span>`
-                : data.siteSince
-                  ? `<span data-more="site">${t.checked} ${clock(data.siteSince)}</span>`
-                  : ""
-          }
+          <div class="status">
+            ${
+              data.siteOk === false && data.siteSince
+                ? `<span class="stale" data-more="site">⚠ ${t.stale} ${clock(data.siteSince)}</span>`
+                : data.updated
+                  ? `<span>${t.updated} ${clock(data.updated)}${
+                      data.fetched ? ` · ${t.fetched} ${clock(data.fetched)}` : ""
+                    }</span>`
+                  : data.siteSince
+                    ? `<span data-more="site">${t.checked} ${clock(data.siteSince)}</span>`
+                    : ""
+            }
+            ${
+              data.ids?.last_update
+                ? `<button class="refresh${this._refreshing ? " spinning" : ""}" title="${t.refresh}"
+                     aria-label="${t.refresh}" ${this._refreshing ? "disabled" : ""}>${ICON_REFRESH}</button>`
+                : ""
+            }
+          </div>
         </div>
       </ha-card>`;
+
+    this.shadowRoot
+      .querySelector(".refresh")
+      ?.addEventListener("click", () => this._refresh(data.ids.last_update));
 
     this.shadowRoot.querySelectorAll("[data-more]").forEach((element) => {
       const entityId = data.ids?.[element.dataset.more];
@@ -550,6 +573,21 @@ class MykolaivOutagesCard extends HTMLElement {
         );
       });
     });
+  }
+
+  _refresh(entityId) {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    this._render();
+    // update_entity on any of the queue's entities refreshes the shared
+    // coordinator: one request to the operator for all entries.
+    const done = () => {
+      this._refreshing = false;
+      this._render();
+    };
+    this._hass
+      .callService("homeassistant", "update_entity", { entity_id: entityId })
+      .then(done, done);
   }
 
   _emergencyRow(data, t) {
@@ -747,6 +785,8 @@ class MykolaivOutagesCardEditor extends HTMLElement {
 
 const ICON_ON = `<svg viewBox="0 0 24 24"><path d="M11 15H6l7-14v8h5l-7 14z"/></svg>`;
 const ICON_OFF = `<svg viewBox="0 0 24 24"><path d="M11 15H6l7-14v8h5l-7 14z" opacity=".55"/><path d="M3.3 4.7l1.4-1.4 16 16-1.4 1.4z"/></svg>`;
+// mdi:refresh
+const ICON_REFRESH = `<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/></svg>`;
 
 const STYLE = `
   :host { --mo-off: var(--error-color, #db4437); --mo-possible: var(--warning-color, #ffa600);
@@ -851,6 +891,15 @@ const STYLE = `
   .summary b { color: var(--primary-text-color); font-weight: 600; }
   .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px;
             font-size: 11px; color: var(--secondary-text-color); }
+  .footer .status { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+  .refresh { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0;
+             border: none; border-radius: 50%; background: none; cursor: pointer;
+             color: var(--secondary-text-color); }
+  .refresh:hover { background: var(--secondary-background-color); color: var(--primary-text-color); }
+  .refresh:disabled { cursor: default; }
+  .refresh svg { width: 16px; height: 16px; fill: currentColor; }
+  .refresh.spinning svg { animation: mo-spin 1s linear infinite; }
+  @keyframes mo-spin { to { transform: rotate(360deg); } }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; }
