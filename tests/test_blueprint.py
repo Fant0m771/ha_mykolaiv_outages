@@ -142,7 +142,19 @@ async def test_blueprint_notifications(hass):
         "message": "10:30–12:00",
     }
 
+    # The emergency outage is still on: no "outage soon" for power that is gone.
     count = len(sent)
+    hass.states.async_set(
+        "sensor.next_outage", (now + timedelta(minutes=10)).isoformat()
+    )
+    await hass.async_block_till_done()
+    assert len(sent) == count
+
+    hass.states.async_set("binary_sensor.emergency", "on", {"source": "emergency"})
+    await hass.async_block_till_done()
+    count = len(sent)
+    hass.states.async_set("sensor.next_outage", (now + timedelta(hours=1)).isoformat())
+    await hass.async_block_till_done()
     hass.states.async_set(
         "sensor.next_outage", (now + timedelta(minutes=10)).isoformat()
     )
