@@ -205,3 +205,41 @@ async def test_single_power_entity_still_valid(hass):
     config = automation_config(power_entity="binary_sensor.power")
     result = await async_validate_config_item(hass, "test", config)
     assert result.validation_error is None, result.validation_error
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_own_power_sensor_decides_the_warning(hass):
+    now = dt_util.utcnow()
+    hass.states.async_set("binary_sensor.power", "on")
+    hass.states.async_set("binary_sensor.emergency", "on", {"source": "emergency"})
+    hass.states.async_set("binary_sensor.grid", "off")
+    hass.states.async_set("sensor.next_outage", (now + timedelta(hours=1)).isoformat())
+    sent = await start(hass, own_power_entity="binary_sensor.grid")
+
+    async def warn():
+        hass.states.async_set(
+            "sensor.next_outage", (now + timedelta(hours=1)).isoformat()
+        )
+        await hass.async_block_till_done()
+        hass.states.async_set(
+            "sensor.next_outage", (now + timedelta(minutes=10)).isoformat()
+        )
+        await hass.async_block_till_done()
+
+    # The grid is already gone, though the operator still reports power.
+    await warn()
+    assert sent == []
+
+    # The grid is there, though the operator already reports an outage.
+    hass.states.async_set("binary_sensor.grid", "on")
+    hass.states.async_set("binary_sensor.power", "off")
+    await hass.async_block_till_done()
+    sent.clear()
+    await warn()
+    assert [call.data["title"] for call in sent] == ["⚡ Скоро відключення"]
+
+    # Unavailable: the operator's status decides again.
+    hass.states.async_set("binary_sensor.grid", "unavailable")
+    sent.clear()
+    await warn()
+    assert sent == []

@@ -52,6 +52,20 @@ blueprint:
         Дії для надсилання; використовуйте {{ title }} і {{ message }}.
       selector:
         action: {}
+    own_power_entity:
+      name: Your power sensor
+      description: >-
+        Optional. A sensor that sees the grid itself, such as an inverter's
+        grid input (on = power). When it says the power is already off, the
+        warning before an outage is not sent; while it is on, the warning is
+        sent even if the operator already reports an outage. Without it, the
+        operator's Power status decides.
+        Необов'язково: власний сенсор світла (наприклад, вхід мережі інвертора).
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
     lead_minutes:
       name: Warn before an outage (minutes)
       description: 0 turns the warning off.
@@ -112,10 +126,17 @@ variables:
   notify_tomorrow: !input notify_tomorrow
   notify_changes: !input notify_changes
   power_entities: !input power_entity
-  # No "outage soon" while the power is already off (an earlier or emergency outage).
+  own_power_entity: !input own_power_entity
+  # No "outage soon" while the power is already off (an earlier or emergency
+  # outage). Your own sensor decides first; the operator's status only without it.
   power_already_off: >-
-    {% set entities = [power_entities] if power_entities is string else power_entities %}
-    {{ entities | select('is_state', 'off') | list | count > 0 }}
+    {% set own = states(own_power_entity) if own_power_entity else 'unknown' %}
+    {% if own in ['on', 'off'] %}
+      {{ own == 'off' }}
+    {% else %}
+      {% set entities = [power_entities] if power_entities is string else power_entities %}
+      {{ entities | select('is_state', 'off') | list | count > 0 }}
+    {% endif %}
   # Only real events: not the entity becoming available or being restored.
   is_event: >-
     {{ trigger.id == 'schedule' and trigger.from_state is not none
