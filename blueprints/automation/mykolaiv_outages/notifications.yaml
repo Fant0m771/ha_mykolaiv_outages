@@ -58,8 +58,10 @@ blueprint:
         Optional. A sensor that sees the grid itself, such as an inverter's
         grid input (on = power). When it says the power is already off, the
         warning before an outage is not sent; while it is on, the warning is
-        sent even if the operator already reports an outage. Without it, the
-        operator's Power status decides.
+        sent even if the operator already reports an outage. When the operator
+        reports power lost or restored later than this sensor saw it, that
+        duplicate is not sent either (emergency outages still are). Without it,
+        the operator's Power status decides.
         Необов'язково: власний сенсор світла (наприклад, вхід мережі інвертора).
       default: ""
       selector:
@@ -137,6 +139,13 @@ variables:
       {% set entities = [power_entities] if power_entities is string else power_entities %}
       {{ entities | select('is_state', 'off') | list | count > 0 }}
     {% endif %}
+  # The operator reports power lost or restored after your own sensor already
+  # saw it: a duplicate, except an emergency outage, which says what happened.
+  own_power_saw_it: >-
+    {% set own = states(own_power_entity) if own_power_entity else 'unknown' %}
+    {{ trigger.id in ['power_off', 'power_on'] and own in ['on', 'off']
+       and own == trigger.to_state.state
+       and trigger.to_state.attributes.source != 'emergency' }}
   # Only real events: not the entity becoming available or being restored.
   is_event: >-
     {{ trigger.id == 'schedule' and trigger.from_state is not none
@@ -149,8 +158,8 @@ variables:
   title: >-
     {%- if trigger.id is not defined -%} 🧪 Перевірка сповіщень
     {%- elif trigger.id == 'soon' and not power_already_off -%} ⚡ Скоро відключення
-    {%- elif trigger.id == 'power_off' and notify_power -%} 🔌 Світло зникло
-    {%- elif trigger.id == 'power_on' and notify_power -%} 💡 Світло є
+    {%- elif trigger.id == 'power_off' and notify_power and not own_power_saw_it -%} 🔌 Світло зникло
+    {%- elif trigger.id == 'power_on' and notify_power and not own_power_saw_it -%} 💡 Світло є
     {%- elif notify_tomorrow and event_type == 'schedule_published' and event_day == 'tomorrow' -%} 📅 Графік на завтра
     {%- elif notify_changes and event_type == 'schedule_changed' -%} 📅 Графік на {{ 'сьогодні' if event_day == 'today' else 'завтра' }} змінено
     {%- elif notify_changes and event_type == 'schedule_published' and event_day == 'today' -%} 📅 Графік на сьогодні опубліковано
@@ -161,7 +170,7 @@ variables:
     {%- elif trigger.id == 'soon' and start is not none -%} Відключення о {{ as_local(start).strftime('%H:%M') }} (через {{ ((start - now()).total_seconds() / 60) | round(0) | int }} хв).
     {%- elif trigger.id == 'power_off' and trigger.to_state.attributes.source == 'emergency' -%} Аварійне відключення ({{ trigger.to_state.attributes.switched_off | join(', ') }}). Час відновлення не публікується.
     {%- elif trigger.id == 'power_off' -%} Обленерго повідомляє про відключення вашої черги.
-    {%- elif trigger.id == 'power_on' -%} Електропостачання відновлено.
+    {%- elif trigger.id == 'power_on' -%} Обленерго повідомляє про відновлення електропостачання.
     {%- else -%} {{ event_schedule }}
     {%- endif -%}
 

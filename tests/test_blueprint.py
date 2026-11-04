@@ -243,3 +243,30 @@ async def test_own_power_sensor_decides_the_warning(hass):
     sent.clear()
     await warn()
     assert sent == []
+
+
+async def test_own_power_sensor_skips_late_operator_status(hass):
+    hass.states.async_set("binary_sensor.power", "on")
+    hass.states.async_set("binary_sensor.emergency", "on", {"source": "emergency"})
+    hass.states.async_set("binary_sensor.grid", "on")
+    sent = await start(hass, own_power_entity="binary_sensor.grid")
+
+    async def operator(entity, state, **attributes):
+        hass.states.async_set(entity, state, attributes)
+        await hass.async_block_till_done()
+        titles = [call.data["title"] for call in sent]
+        sent.clear()
+        return titles
+
+    # The operator reports the outage first: sent.
+    assert await operator("binary_sensor.power", "off") == ["🔌 Світло зникло"]
+    # Your sensor saw the power come back before the operator did: skipped.
+    hass.states.async_set("binary_sensor.grid", "on")
+    assert await operator("binary_sensor.power", "on") == []
+    # Your sensor saw the outage 20 minutes before the operator: skipped.
+    hass.states.async_set("binary_sensor.grid", "off")
+    assert await operator("binary_sensor.power", "off") == []
+    # An emergency outage says what happened: still sent.
+    assert await operator(
+        "binary_sensor.emergency", "off", source="emergency", switched_off=["5.1"]
+    ) == ["🔌 Світло зникло"]
