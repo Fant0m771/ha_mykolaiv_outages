@@ -258,8 +258,15 @@ async def test_own_power_sensor_skips_late_operator_status(hass):
         sent.clear()
         return titles
 
-    # The operator reports the outage first: sent.
-    assert await operator("binary_sensor.power", "off") == ["🔌 Світло зникло"]
+    # The operator reports the outage while your sensor still sees the grid.
+    hass.states.async_set("binary_sensor.power", "off")
+    await hass.async_block_till_done()
+    assert sent[-1].data == {
+        "title": "⚠️ Обленерго: відключення",
+        "message": "Обленерго повідомляє про відключення вашої черги."
+        " Але за вашим сенсором світло ще є.",
+    }
+    sent.clear()
     # Your sensor saw the power come back before the operator did: skipped.
     hass.states.async_set("binary_sensor.grid", "on")
     assert await operator("binary_sensor.power", "on") == []
@@ -270,3 +277,11 @@ async def test_own_power_sensor_skips_late_operator_status(hass):
     assert await operator(
         "binary_sensor.emergency", "off", source="emergency", switched_off=["5.1"]
     ) == ["🔌 Світло зникло"]
+    # The operator reports power back while your sensor still sees none.
+    hass.states.async_set("binary_sensor.power", "on")
+    await hass.async_block_till_done()
+    assert sent[-1].data == {
+        "title": "⚠️ Обленерго: світло є",
+        "message": "Обленерго повідомляє про відновлення електропостачання."
+        " Але за вашим сенсором світла ще немає.",
+    }
